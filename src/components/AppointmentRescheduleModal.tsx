@@ -4,7 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { DataService } from "@/services/dataService";
+
+const dataService = new DataService();
 
 interface AppointmentRescheduleModalProps {
   isOpen: boolean;
@@ -40,15 +42,10 @@ const AppointmentRescheduleModal = ({
       const appointmentDateTime = `${formData.appointment_date}T${formData.appointment_time}:00`;
       
       // Update appointment with new datetime
-      const { error } = await supabase
-        .from('appointments')
-        .update({ 
-          appointment_datetime: appointmentDateTime,
-          status: 'pending' // Reset status to pending for rescheduled appointments
-        })
-        .eq('id', appointment.id);
-
-      if (error) throw error;
+      await dataService.updateAppointment(appointment.id, {
+        appointment_datetime: appointmentDateTime,
+        status: 'pending' // Reset status to pending for rescheduled appointments
+      });
 
       toast.success("Appointment rescheduled successfully!");
       

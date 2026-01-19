@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { db } from './db';
 import { syncService, generateId } from './syncService';
-import type { Patient, Dentist, Appointment } from '@/types';
+import type { Patient, Dentist, Appointment, MedicalHistory, Visit, Payment } from '@/types';
 
 export class DataService {
   private async isOnline(): Promise<boolean> {
@@ -218,6 +218,178 @@ export class DataService {
     } else {
       await syncService.addToSyncQueue('appointments', 'delete', { id });
     }
+  }
+
+  // Medical History
+  async getMedicalHistory(patientId: string): Promise<MedicalHistory | undefined> {
+    const online = await this.isOnline();
+
+    if (online) {
+      try {
+        const { data, error } = await supabase
+          .from('medical_history')
+          .select('*')
+          .eq('patient_id', patientId)
+          .single();
+
+        if (!error && data) {
+          await db.medicalHistory.put(data);
+          return data;
+        }
+      } catch (error) {
+        console.error('Error fetching from server, using local data:', error);
+      }
+    }
+
+    return await db.medicalHistory.get({ patient_id: patientId } as any);
+  }
+
+  async addMedicalHistory(history: Omit<MedicalHistory, 'id' | 'created_at' | 'updated_at'>): Promise<MedicalHistory> {
+    const online = await this.isOnline();
+    const newHistory: MedicalHistory = {
+      ...history,
+      id: generateId(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    await db.medicalHistory.add(newHistory);
+
+    if (online) {
+      try {
+        const { error } = await supabase.from('medical_history').insert(newHistory);
+        if (error) throw error;
+      } catch (error) {
+        await syncService.addToSyncQueue('medicalHistory', 'insert', newHistory);
+      }
+    } else {
+      await syncService.addToSyncQueue('medicalHistory', 'insert', newHistory);
+    }
+
+    return newHistory;
+  }
+
+  async updateMedicalHistory(id: string, updates: Partial<MedicalHistory>): Promise<void> {
+    const online = await this.isOnline();
+    const updatedData = { ...updates, updated_at: new Date().toISOString() };
+
+    await db.medicalHistory.update(id, updatedData);
+
+    if (online) {
+      try {
+        const { error } = await supabase
+          .from('medical_history')
+          .update(updatedData)
+          .eq('id', id);
+        if (error) throw error;
+      } catch (error) {
+        await syncService.addToSyncQueue('medicalHistory', 'update', { id, ...updatedData });
+      }
+    } else {
+      await syncService.addToSyncQueue('medicalHistory', 'update', { id, ...updatedData });
+    }
+  }
+
+  // Visits
+  async getVisitsByPatient(patientId: string): Promise<Visit[]> {
+    const online = await this.isOnline();
+
+    if (online) {
+      try {
+        const { data, error } = await supabase
+          .from('visits')
+          .select('*')
+          .eq('patient_id', patientId)
+          .order('visit_date', { ascending: false });
+
+        if (!error && data) {
+          // Update local DB with fetched data
+          for (const visit of data) {
+            await db.visits.put(visit);
+          }
+          return data;
+        }
+      } catch (error) {
+        console.error('Error fetching from server, using local data:', error);
+      }
+    }
+
+    return await db.visits.where('patient_id').equals(patientId).reverse().sortBy('visit_date');
+  }
+
+  async addVisit(visit: Omit<Visit, 'id' | 'created_at'>): Promise<Visit> {
+    const online = await this.isOnline();
+    const newVisit: Visit = {
+      ...visit,
+      id: generateId(),
+      created_at: new Date().toISOString()
+    };
+
+    await db.visits.add(newVisit);
+
+    if (online) {
+      try {
+        const { error } = await supabase.from('visits').insert(newVisit);
+        if (error) throw error;
+      } catch (error) {
+        await syncService.addToSyncQueue('visits', 'insert', newVisit);
+      }
+    } else {
+      await syncService.addToSyncQueue('visits', 'insert', newVisit);
+    }
+
+    return newVisit;
+  }
+
+  // Payments
+  async getPaymentsByPatient(patientId: string): Promise<Payment[]> {
+    const online = await this.isOnline();
+
+    if (online) {
+      try {
+        const { data, error } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('patient_id', patientId)
+          .order('payment_date', { ascending: false });
+
+        if (!error && data) {
+          // Update local DB with fetched data
+          for (const payment of data) {
+            await db.payments.put(payment);
+          }
+          return data;
+        }
+      } catch (error) {
+        console.error('Error fetching from server, using local data:', error);
+      }
+    }
+
+    return await db.payments.where('patient_id').equals(patientId).reverse().sortBy('payment_date');
+  }
+
+  async addPayment(payment: Omit<Payment, 'id' | 'created_at'>): Promise<Payment> {
+    const online = await this.isOnline();
+    const newPayment: Payment = {
+      ...payment,
+      id: generateId(),
+      created_at: new Date().toISOString()
+    };
+
+    await db.payments.add(newPayment);
+
+    if (online) {
+      try {
+        const { error } = await supabase.from('payments').insert(newPayment);
+        if (error) throw error;
+      } catch (error) {
+        await syncService.addToSyncQueue('payments', 'insert', newPayment);
+      }
+    } else {
+      await syncService.addToSyncQueue('payments', 'insert', newPayment);
+    }
+
+    return newPayment;
   }
 }
 

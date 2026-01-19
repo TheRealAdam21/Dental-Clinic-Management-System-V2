@@ -8,11 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { DataService } from "@/services/dataService";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { patientSchema, medicalHistorySchema } from "@/lib/validationSchemas";
 
-// TODO: Refactor to use dataService for offline support
+const dataService = new DataService();
 
 const PatientForm = () => {
   const { isAuthorized, loading: authLoading } = useAuthGuard();
@@ -125,13 +125,7 @@ const PatientForm = () => {
       // Validate using schema
       const validatedPatientData = patientSchema.parse(patientData);
 
-      const { data: patientResult, error: patientError } = await supabase
-        .from('patients')
-        .insert([patientData])
-        .select()
-        .single();
-
-      if (patientError) throw patientError;
+      const patientResult = await dataService.addPatient(patientData);
 
       // Only insert medical history if the user chose to include it
       if (includeMedicalHistory) {
@@ -168,11 +162,7 @@ const PatientForm = () => {
           const validatedMedicalData = medicalHistorySchema.parse(medicalHistoryData);
         }
 
-        const { error: medicalHistoryError } = await supabase
-          .from('medical_history')
-          .insert([medicalHistoryData]);
-
-        if (medicalHistoryError) throw medicalHistoryError;
+        await dataService.addMedicalHistory(medicalHistoryData);
       }
 
       toast.success("Patient registered successfully!");

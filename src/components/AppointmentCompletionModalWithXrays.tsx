@@ -6,9 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { DataService } from "@/services/dataService";
 import { supabase } from "@/integrations/supabase/client";
 import { Calendar, DollarSign } from "lucide-react";
 import XrayImageUpload from "./XrayImageUpload";
+
+const dataService = new DataService();
 
 interface AppointmentCompletionModalWithXraysProps {
   appointment: any;
@@ -47,16 +50,14 @@ const AppointmentCompletionModalWithXrays = ({
     
     try {
       // Create visit record
-      const { error: visitError } = await supabase
-        .from('visits')
-        .insert([{
-          ...formData,
-          patient_id: appointment.patient_id,
-          treatment_cost: formData.treatment_cost ? parseFloat(formData.treatment_cost) : null,
-          xray_images: xrayImages.length > 0 ? xrayImages : null
-        }]);
-
-      if (visitError) throw visitError;
+      await dataService.addVisit({
+        ...formData,
+        patient_id: appointment.patient_id,
+        appointment_id: appointment.id,
+        treatment_provided: formData.treatment,
+        amount_charged: formData.treatment_cost ? parseFloat(formData.treatment_cost) : undefined,
+        notes: formData.notes
+      } as any);
 
       // Update patient's X-ray images if any were added
       if (xrayImages.length > 0) {
@@ -82,12 +83,7 @@ const AppointmentCompletionModalWithXrays = ({
       }
 
       // Mark appointment as completed
-      const { error: appointmentError } = await supabase
-        .from('appointments')
-        .update({ status: 'completed' })
-        .eq('id', appointment.id);
-
-      if (appointmentError) throw appointmentError;
+      await dataService.updateAppointment(appointment.id, { status: 'completed' });
 
       toast.success("Appointment completed and visit record created successfully!");
       onComplete();

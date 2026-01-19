@@ -4,10 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
+import { DataService } from "@/services/dataService";
 import { User, Phone, Mail, Calendar, FileText, Eye, Image as ImageIcon } from "lucide-react";
 import VisitTracker from "./VisitTracker";
 import PatientXrayManager from "./PatientXrayManager";
+
+const dataService = new DataService();
 
 interface PatientListProps {
   showVisits?: boolean;
@@ -25,15 +27,11 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
   }, []);
 
   const fetchPatients = async () => {
-    const { data, error } = await supabase
-      .from('patients')
-      .select('*')
-      .order('last_name', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching patients:', error);
-    } else {
+    try {
+      const data = await dataService.getPatients();
       setPatients(data || []);
+    } catch (error) {
+      console.error('Error fetching patients:', error);
     }
     setLoading(false);
   };
