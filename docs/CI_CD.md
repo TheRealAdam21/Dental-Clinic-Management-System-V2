@@ -135,6 +135,34 @@ No `VERCEL_TOKEN` GitHub secret is required when using Vercel's native GitHub in
 
 ## Desktop builds
 
-Windows installers are uploaded as GitHub Actions artifacts from the **Build Tauri (Windows)** job on each push to `main`.
+### Where to download the Windows app
 
-Download from: **Actions → CI → latest run → Artifacts → tooth-time-windows-installer**.
+The installers are **not stored inside the git repo**. They are built in GitHub Actions and kept as downloads:
+
+| When | Where to get it |
+|------|-----------------|
+| Every push to `main` | GitHub → **Actions** → **CI** → latest run → **Artifacts** → `tooth-time-windows-installer` |
+| Version tag like `v2.0.1` | GitHub → **Releases** → that version → download `.exe` or `.msi` |
+| Build on your PC | `npm run tauri build` → `src-tauri/target/release/bundle/` |
+
+Artifact retention on GitHub is limited (about 90 days), so use **Releases** for installers you want to keep long term.
+
+### Automatic release (recommended)
+
+Push a version tag to create a public GitHub Release with the Windows installers attached:
+
+```bash
+git tag v2.0.1
+git push origin v2.0.1
+```
+
+That runs the **Release Desktop App** workflow and publishes the `.exe` and `.msi` under **Releases** on the repo page.
+
+You can also run it manually: **Actions → Release Desktop App → Run workflow**.
+
+### Local build paths
+
+After `npm run tauri build` on Windows:
+
+- **NSIS installer:** `src-tauri/target/release/bundle/nsis/Tooth Time_*-setup.exe`
+- **MSI installer:** `src-tauri/target/release/bundle/msi/Tooth Time_*.msi`
