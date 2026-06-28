@@ -97,9 +97,19 @@ vercel git connect https://github.com/TheRealAdam21/Dental-Clinic-Management-Sys
 - **Trigger:** every push/PR to `main`
 - **Where to check:** GitHub → Actions tab → **CI** workflow
 - **What it does:**
+  - Runs unit tests (`npm test`) — must pass before build
   - Installs deps and builds the web app (catches broken code)
   - Runs lint (warnings won't block the workflow)
   - On `main` only: builds the Windows Tauri `.exe` installer as a downloadable artifact
+
+### Run checks locally before pushing
+
+```bash
+npm install --legacy-peer-deps
+npm test
+npm run lint
+npm run build
+```
 
 ### Your day-to-day
 

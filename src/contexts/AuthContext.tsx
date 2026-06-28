@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { sensitiveStore, SENSITIVE_KEYS } from '@/lib/sensitiveStore';
-import { pullDentistsFromSupabase, findDentistForLogin } from '@/lib/authService';
+import { findDentistForLogin, preloadDentistAccounts } from '@/lib/authService';
 import { syncService } from '@/services/syncService';
 
 interface LocalUser {
@@ -53,14 +53,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem(LOCAL_AUTH_KEY);
       }
 
-      try {
-        await pullDentistsFromSupabase();
-        await syncService.syncAll();
-      } catch (error) {
+      setLoading(false);
+
+      preloadDentistAccounts();
+      void syncService.syncAll().catch((error) => {
         console.error('Failed to preload clinic data:', error);
-      } finally {
-        setLoading(false);
-      }
+      });
     };
 
     void bootstrap();

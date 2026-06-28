@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -40,13 +41,17 @@ export default defineConfig(() => {
           importScripts: ['push-handler.js'],
           runtimeCaching: [
             {
+              urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/.*/i,
+              handler: 'NetworkOnly',
+            },
+            {
               urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
               handler: 'NetworkFirst',
               options: {
                 cacheName: 'supabase-cache',
                 expiration: {
-                  maxEntries: 100,
-                  maxAgeSeconds: 60 * 60 * 24 * 7
+                  maxEntries: 50,
+                  maxAgeSeconds: 60 * 60
                 },
                 cacheableResponse: {
                   statuses: [0, 200]
@@ -81,6 +86,11 @@ export default defineConfig(() => {
         },
       },
     },
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
   });
 });
