@@ -46,6 +46,12 @@ jobs:
           VITE_ENABLE_REMOTE_SYNC: true
           VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
 
+      - name: Notify Vercel
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: vercel/repository-dispatch/actions/status@v1
+        with:
+          name: "Vercel - tooth-time-dental: ci"
+
   tauri:
     name: Build Tauri (Windows)
     runs-on: windows-latest

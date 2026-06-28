@@ -79,17 +79,16 @@ git push to main
 
 #### Require CI before production (Deployment Checks)
 
-This is **not** on the Git settings page. Use:
+Vercel does **not** auto-list normal GitHub job names. You must register a Vercel-specific check:
 
-**Vercel → tooth-time-dental → Settings → Deployment Checks → Add Checks**
+1. Push the latest `main` so CI runs once with the **Notify Vercel** step
+2. Vercel → **Deployment Checks** → **Connect GitHub Actions**
+3. **Check name:** `ci`  
+   (full name: `Vercel - tooth-time-dental: ci`)
+4. Or paste the latest green commit SHA under **Enter a GitHub SHA** if the list is empty
+5. Add the check and save
 
-1. Choose **GitHub** as the provider
-2. Select the **CI** workflow / `web` job check
-3. Save
-
-After that, production deploys still build on every `main` push, but your live domain only updates after CI tests pass.
-
-If you do not see Deployment Checks, your Vercel plan or GitHub app permissions may need updating — use PR preview URLs and only merge when GitHub Actions is green as a manual fallback.
+Production will only go live after that check passes.
 
 #### Troubleshooting Vercel deploys
 
