@@ -22,8 +22,14 @@ export class DataService {
 
         if (!error && data) {
           await db.patients.clear();
-          await db.patients.bulkAdd(data);
+          if (data.length > 0) {
+            await db.patients.bulkAdd(data);
+          }
           return data;
+        }
+
+        if (error) {
+          console.error('Supabase patients fetch failed:', error.message);
         }
       } catch (error) {
         console.error('Error fetching from server, using local data:', error);
@@ -92,8 +98,14 @@ export class DataService {
 
         if (!error && data) {
           await db.dentists.clear();
-          await db.dentists.bulkAdd(data);
-          return data;
+          if (data.length > 0) {
+            await db.dentists.bulkAdd(data);
+          }
+          return data as Dentist[];
+        }
+
+        if (error) {
+          console.error('Supabase dentists fetch failed:', error.message);
         }
       } catch (error) {
         console.error('Error fetching from server, using local data:', error);
@@ -107,6 +119,7 @@ export class DataService {
     const online = await this.isOnline();
     const newDentist: Dentist = {
       ...dentist,
+      email: dentist.email || `${dentist.username}@clinic.local`,
       id: generateId(),
       created_at: new Date().toISOString(),
     };

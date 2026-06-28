@@ -22,33 +22,7 @@ export class SyncService {
     });
   }
 
-  async syncAll(): Promise<void> {
-    if (this.syncInProgress) return;
-
-    const state = await db.appState.get(1);
-    if (!state?.isOnline) return;
-
-    this.syncInProgress = true;
-    await db.appState.update(1, { syncInProgress: true });
-
-    try {
-      // First, pull data from server to local
-      await this.pullFromServer();
-
-      // Then, push local changes to server
-      await this.pushToServer();
-
-      // Update last sync time
-      await db.appState.update(1, { lastSync: Date.now() });
-    } catch (error) {
-      console.error('Sync error:', error);
-    } finally {
-      this.syncInProgress = false;
-      await db.appState.update(1, { syncInProgress: false });
-    }
-  }
-
-  private async pullFromServer(): Promise<void> {
+  async pullFromServer(): Promise<void> {
     const tables = ['patients', 'dentists', 'appointments', 'medicalHistory', 'visits', 'payments'];
     const dbTableMap: Record<string, string> = {
       patients: 'patients',
@@ -61,21 +35,44 @@ export class SyncService {
 
     for (const table of tables) {
       try {
-        const { data, error } = await supabase
-          .from(dbTableMap[table])
-          .select('*')
-          .order('updated_at', { ascending: false });
+        const { data, error } = await supabase.from(dbTableMap[table]).select('*');
 
         if (error) throw error;
 
         if (data) {
-          const dbTable = db[table as keyof typeof db] as any;
+          const dbTable = db[table as keyof typeof db] as {
+            clear: () => Promise<void>;
+            bulkPut: (rows: unknown[]) => Promise<void>;
+          };
           await dbTable.clear();
-          await dbTable.bulkAdd(data);
+          if (data.length > 0) {
+            await dbTable.bulkPut(data);
+          }
         }
       } catch (error) {
         console.error(`Error pulling ${table}:`, error);
       }
+    }
+  }
+
+  async syncAll(): Promise<void> {
+    if (this.syncInProgress) return;
+
+    const state = await db.appState.get(1);
+    if (!state?.isOnline && !navigator.onLine) return;
+
+    this.syncInProgress = true;
+    await db.appState.update(1, { syncInProgress: true, isOnline: navigator.onLine });
+
+    try {
+      await this.pullFromServer();
+      await this.pushToServer();
+      await db.appState.update(1, { lastSync: Date.now() });
+    } catch (error) {
+      console.error('Sync error:', error);
+    } finally {
+      this.syncInProgress = false;
+      await db.appState.update(1, { syncInProgress: false });
     }
   }
 

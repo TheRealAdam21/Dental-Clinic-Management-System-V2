@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { dataService } from "@/services/dataService";
+import { syncService } from "@/services/syncService";
 import type { Dentist } from "@/types";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,12 +25,21 @@ const AdminDentistManager = () => {
   });
 
   const fetchDentists = async () => {
+    await syncService.syncAll();
     const data = await dataService.getDentists();
     setDentists(data);
   };
 
   useEffect(() => {
-    fetchDentists();
+    const load = async () => {
+      setLoading(true);
+      try {
+        await fetchDentists();
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
   }, []);
 
   const editForm = useMemo(() => {

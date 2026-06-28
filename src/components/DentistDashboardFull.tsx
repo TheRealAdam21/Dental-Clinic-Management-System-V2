@@ -19,7 +19,7 @@ type DashboardMode = 'admin' | 'dentist';
 
 const DentistDashboardFull = ({ mode }: { mode: DashboardMode }) => {
   const [activeTab, setActiveTab] = useState("appointments");
-  const [isRecordsAuthenticated, setIsRecordsAuthenticated] = useState(false);
+  const [isRecordsAuthenticated, setIsRecordsAuthenticated] = useState(mode === 'admin');
   const { signOut, user } = useAuth();
   const isAdmin = mode === 'admin';
   useAppointmentNotifications(user);

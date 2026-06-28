@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DataService } from "@/services/dataService";
+import { syncService } from "@/services/syncService";
 import { User, Phone, Mail, Calendar, Eye, Image as ImageIcon, FileBadge, Trash2 } from "lucide-react";
 import VisitTracker from "./VisitTracker";
 import PatientXrayManager from "./PatientXrayManager";
@@ -37,12 +38,15 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
 
   const fetchPatients = async () => {
     try {
+      setLoading(true);
+      await syncService.syncAll();
       const data = await dataService.getPatients();
       setPatients(data || []);
     } catch (error) {
       console.error('Error fetching patients:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const filteredPatients = patients.filter(patient =>

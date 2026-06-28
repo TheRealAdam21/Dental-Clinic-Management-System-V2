@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { sensitiveStore, SENSITIVE_KEYS } from '@/lib/sensitiveStore';
 import { pullDentistsFromSupabase, findDentistForLogin } from '@/lib/authService';
+import { syncService } from '@/services/syncService';
 
 interface LocalUser {
   id: string;
@@ -54,8 +55,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         await pullDentistsFromSupabase();
+        await syncService.syncAll();
       } catch (error) {
-        console.error('Failed to preload dentists:', error);
+        console.error('Failed to preload clinic data:', error);
       } finally {
         setLoading(false);
       }
@@ -98,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(localSession);
       setUser(userData);
       setUserRole(userData.role);
+      void syncService.syncAll();
       return { error: null };
     } catch (error) {
       return { error: { message: 'Invalid username or password' } };
