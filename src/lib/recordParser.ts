@@ -92,19 +92,38 @@ const extractNameParts = (text: string): { first_name: string; last_name: string
     "name",
   ]);
 
-  if (!fullName) return { first_name: "", last_name: "" };
+  if (fullName) {
+    if (fullName.includes(",")) {
+      const [last, first] = fullName.split(",").map((part) => part.trim());
+      return { first_name: first ?? "", last_name: last ?? "" };
+    }
 
-  if (fullName.includes(",")) {
-    const [last, first] = fullName.split(",").map((part) => part.trim());
-    return { first_name: first ?? "", last_name: last ?? "" };
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return { first_name: parts[0], last_name: "" };
+    return {
+      first_name: parts[0],
+      last_name: parts.slice(1).join(" "),
+    };
   }
 
-  const parts = fullName.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return { first_name: parts[0], last_name: "" };
-  return {
-    first_name: parts[0],
-    last_name: parts.slice(1).join(" "),
-  };
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length >= 3);
+
+  for (const line of lines) {
+    const cleaned = line.replace(/[^A-Za-z\s'.-]/g, " ").replace(/\s+/g, " ").trim();
+    const parts = cleaned.split(/\s+/).filter(Boolean);
+    if (parts.length < 2 || parts.length > 5) continue;
+    if (!parts.every((part) => /^[A-Za-z][A-Za-z'.-]*$/.test(part))) continue;
+
+    return {
+      first_name: parts[0],
+      last_name: parts.slice(1).join(" "),
+    };
+  }
+
+  return { first_name: "", last_name: "" };
 };
 
 const extractAmount = (value: string): number | null => {

@@ -1,6 +1,36 @@
 import { Capacitor } from "@capacitor/core";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 
+const normalizeImageDataUrl = (dataUrl: string): Promise<string> =>
+  new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      if (!context) {
+        resolve(dataUrl);
+        return;
+      }
+
+      canvas.width = image.width;
+      canvas.height = image.height;
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    image.onerror = () => resolve(dataUrl);
+    image.src = dataUrl;
+  });
+
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Failed to read image file"));
+    reader.readAsDataURL(file);
+  });
+
 export const captureRecordImage = async (): Promise<string | null> => {
   if (Capacitor.isNativePlatform()) {
     try {
@@ -14,7 +44,7 @@ export const captureRecordImage = async (): Promise<string | null> => {
         promptLabelPhoto: "Choose from gallery",
         promptLabelPicture: "Take photo",
       });
-      return photo.dataUrl ?? null;
+      return photo.dataUrl ? await normalizeImageDataUrl(photo.dataUrl) : null;
     } catch {
       return null;
     }
@@ -33,7 +63,10 @@ export const captureRecordImage = async (): Promise<string | null> => {
       }
 
       const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
+      reader.onload = async () => {
+        const dataUrl = String(reader.result);
+        resolve(await normalizeImageDataUrl(dataUrl));
+      };
       reader.onerror = () => resolve(null);
       reader.readAsDataURL(file);
     };
@@ -55,15 +88,7 @@ export const pickRecordImages = async (): Promise<string[]> => {
       }
 
       const readers = await Promise.all(
-        files.map(
-          (file) =>
-            new Promise<string>((fileResolve, fileReject) => {
-              const reader = new FileReader();
-              reader.onload = () => fileResolve(String(reader.result));
-              reader.onerror = () => fileReject(new Error("Failed to read image"));
-              reader.readAsDataURL(file);
-            })
-        )
+        files.map(async (file) => normalizeImageDataUrl(await readFileAsDataUrl(file)))
       );
 
       resolve(readers);

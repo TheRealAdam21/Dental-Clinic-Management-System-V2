@@ -38,6 +38,7 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          globIgnores: ['**/tesseract/**'],
           importScripts: ['push-handler.js'],
           runtimeCaching: [
             {
@@ -81,6 +82,9 @@ export default defineConfig(() => {
       output: {
         manualChunks: (id) => {
           if (id.includes("node_modules")) {
+            if (id.includes("tesseract")) {
+              return undefined;
+            }
             return "vendor";
           }
         },

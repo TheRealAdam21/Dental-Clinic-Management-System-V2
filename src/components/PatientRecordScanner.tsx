@@ -144,7 +144,14 @@ const PatientRecordScanner = ({
       }
     } catch (error) {
       console.error(error);
-      toast.error("Failed to scan the record. Try a clearer, well-lit photo.");
+      const message = error instanceof Error ? error.message : "Unknown OCR error";
+      if (/image|decode|format/i.test(message)) {
+        toast.error("Could not read that image. Use JPG or PNG, or retake the photo.");
+      } else if (/worker|wasm|tesseract|network|fetch/i.test(message)) {
+        toast.error("OCR engine failed to load. Refresh the page and try again.");
+      } else {
+        toast.error(`Failed to scan the record: ${message}`);
+      }
     } finally {
       setScanning(false);
     }
