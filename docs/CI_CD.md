@@ -21,7 +21,7 @@ gh repo create Dental-Clinic-Management-System-V2 --public --source=. --remote=o
 Or, if the repo already exists:
 
 ```bash
-git remote add origin https://github.com/YOUR_USERNAME/Dental-Clinic-Management-System-V2.git
+git remote add origin https://github.com/TheRealAdam21/Dental-Clinic-Management-System-V2.git
 git push -u origin main
 ```
 

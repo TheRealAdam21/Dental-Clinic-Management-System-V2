@@ -1,0 +1,6 @@
+#!/bin/sh
+# Remove Cursor co-author trailers from commit messages.
+COMMIT_MSG_FILE=$1
+if [ -f "$COMMIT_MSG_FILE" ]; then
+  grep -vi '^co-authored-by: cursor' "$COMMIT_MSG_FILE" > "$COMMIT_MSG_FILE.tmp" && mv "$COMMIT_MSG_FILE.tmp" "$COMMIT_MSG_FILE"
+fi

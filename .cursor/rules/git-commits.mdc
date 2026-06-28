@@ -1,0 +1,7 @@
+---
+description: Git commit rules for this project
+alwaysApply: true
+---
+
+Never add `Co-authored-by: Cursor` or any Cursor co-author trailer to commit messages.
+Use plain commit messages only.
