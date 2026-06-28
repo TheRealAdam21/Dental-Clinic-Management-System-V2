@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { DataService } from "@/services/dataService";
-import { supabase } from "@/integrations/supabase/client";
 import { Calendar, DollarSign } from "lucide-react";
 import XrayImageUpload from "./XrayImageUpload";
 
@@ -54,32 +53,21 @@ const AppointmentCompletionModalWithXrays = ({
         ...formData,
         patient_id: appointment.patient_id,
         appointment_id: appointment.id,
+        diagnosis: formData.diagnosis,
+        treatment: formData.treatment,
         treatment_provided: formData.treatment,
+        treatment_cost: formData.treatment_cost ? parseFloat(formData.treatment_cost) : null,
         amount_charged: formData.treatment_cost ? parseFloat(formData.treatment_cost) : undefined,
-        notes: formData.notes
-      } as any);
+        notes: formData.notes,
+        xray_images: xrayImages.length > 0 ? xrayImages : null
+      });
 
-      // Update patient's X-ray images if any were added
+      // Also store X-rays on patient record (local)
       if (xrayImages.length > 0) {
-        // Fetch existing patient X-rays
-        const { data: patientData } = await supabase
-          .from('patients')
-          .select('xray_images')
-          .eq('id', appointment.patient_id)
-          .single();
-
-        const existingXrays = patientData?.xray_images || [];
+        const patient = await dataService.getPatientById(appointment.patient_id);
+        const existingXrays = patient?.xray_images || [];
         const allXrays = [...existingXrays, ...xrayImages];
-
-        // Update patient record with combined X-rays
-        const { error: updateError } = await supabase
-          .from('patients')
-          .update({ xray_images: allXrays })
-          .eq('id', appointment.patient_id);
-
-        if (updateError) {
-          console.error('Error updating patient X-rays:', updateError);
-        }
+        await dataService.updatePatient(appointment.patient_id, { xray_images: allXrays });
       }
 
       // Mark appointment as completed
@@ -132,7 +120,7 @@ const AppointmentCompletionModalWithXrays = ({
             <div>
               <Label htmlFor="treatment_cost">Treatment Cost (₱)</Label>
               <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-gray-500" />
+                
                 <Input
                   id="treatment_cost"
                   type="number"
@@ -184,6 +172,7 @@ const AppointmentCompletionModalWithXrays = ({
             <Label className="text-base font-semibold">X-ray Images (Optional)</Label>
             <p className="text-sm text-gray-600 mb-2">Upload any X-ray images taken during this appointment</p>
             <XrayImageUpload
+              patientId={appointment?.patient_id}
               existingImages={xrayImages}
               onImagesChange={handleXrayImagesChange}
             />

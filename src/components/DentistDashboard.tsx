@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Calendar, Clock, User, FileText, CheckCircle, Trash2, RefreshCw } from "lucide-react";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
@@ -16,6 +17,8 @@ const DentistDashboard = () => {
   const [completionModalOpen, setCompletionModalOpen] = useState(false);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
   const { isAuthorized, loading: authLoading } = useAuthGuard();
 
   useEffect(() => {
@@ -29,7 +32,7 @@ const DentistDashboard = () => {
     
     try {
       const data = await dataService.getAppointments();
-      setAppointments(data);
+      setAppointments(data.filter((a) => a.status !== 'completed' && a.status !== 'cancelled'));
     } catch (error) {
       toast.error("Failed to fetch appointments");
     } finally {
@@ -47,15 +50,19 @@ const DentistDashboard = () => {
     }
   };
 
-  const deleteAppointment = async (appointmentId: string) => {
-    if (!confirm("Are you sure you want to delete this appointment? This action cannot be undone.")) {
-      return;
-    }
+  const requestDeleteAppointment = (appointment: Appointment) => {
+    setAppointmentToDelete(appointment);
+    setDeleteDialogOpen(true);
+  };
 
+  const deleteAppointment = async () => {
+    if (!appointmentToDelete) return;
     try {
-      await dataService.deleteAppointment(appointmentId);
+      await dataService.deleteAppointment(appointmentToDelete.id);
       toast.success("Appointment deleted successfully");
       fetchAppointments();
+      setDeleteDialogOpen(false);
+      setAppointmentToDelete(null);
     } catch (error) {
       toast.error("Failed to delete appointment");
     }
@@ -89,10 +96,20 @@ const DentistDashboard = () => {
   };
 
   const formatDateTime = (dateTimeString: string) => {
-    const date = new Date(dateTimeString);
+    const [rawDate, rawTime = ""] = dateTimeString.split("T");
+    const [year, month, day] = rawDate.split("-").map(Number);
+    const date = new Date(year, (month || 1) - 1, day || 1);
+    const hhmm = rawTime.slice(0, 5);
+    let displayTime = "--:--";
+    if (hhmm.includes(":")) {
+      const [h, m] = hhmm.split(":").map(Number);
+      const hour12 = h % 12 || 12;
+      const suffix = h >= 12 ? "PM" : "AM";
+      displayTime = `${hour12}:${`${m}`.padStart(2, "0")} ${suffix}`;
+    }
     return {
       date: date.toLocaleDateString(),
-      time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: displayTime
     };
   };
 
@@ -210,7 +227,7 @@ const DentistDashboard = () => {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => deleteAppointment(appointment.id)}
+                              onClick={() => requestDeleteAppointment(appointment)}
                               className="text-red-600 border-red-600 hover:bg-red-50"
                             >
                               <Trash2 className="h-4 w-4 mr-1" />
@@ -241,6 +258,36 @@ const DentistDashboard = () => {
         appointment={selectedAppointment}
         onReschedule={fetchAppointments}
       />
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Appointment</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this appointment for{" "}
+              <strong>
+                {appointmentToDelete?.patient?.first_name} {appointmentToDelete?.patient?.last_name}
+              </strong>
+              ? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setAppointmentToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={deleteAppointment}>
+              Delete Appointment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

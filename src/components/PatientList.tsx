@@ -4,10 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DataService } from "@/services/dataService";
-import { User, Phone, Mail, Calendar, FileText, Eye, Image as ImageIcon } from "lucide-react";
+import { User, Phone, Mail, Calendar, Eye, Image as ImageIcon, FileBadge, Trash2 } from "lucide-react";
 import VisitTracker from "./VisitTracker";
 import PatientXrayManager from "./PatientXrayManager";
+import DentalCertificateGenerator from "./DentalCertificateGenerator";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const dataService = new DataService();
 
@@ -16,11 +20,16 @@ interface PatientListProps {
 }
 
 const PatientList = ({ showVisits = false }: PatientListProps) => {
+  const { userRole } = useAuth();
+  const canDeletePatients = userRole === "admin" || userRole === "dentist";
   const [patients, setPatients] = useState<any[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'list' | 'visits' | 'xrays'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'visits' | 'xrays' | 'certificate'>('list');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [patientToDelete, setPatientToDelete] = useState<any | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   useEffect(() => {
     fetchPatients();
@@ -41,6 +50,32 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
     patient.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     patient.phone?.includes(searchTerm)
   );
+
+  const handleDeletePatient = async (patient: any) => {
+    if (!canDeletePatients) return;
+    setPatientToDelete(patient);
+    setDeleteConfirmText("");
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeletePatient = async () => {
+    if (!patientToDelete) return;
+    if (deleteConfirmText.trim() !== "DELETE") {
+      toast.error('Type DELETE to confirm removal.');
+      return;
+    }
+    try {
+      await dataService.deletePatient(patientToDelete.id);
+      setPatients((prev) => prev.filter((p) => p.id !== patientToDelete.id));
+      toast.success("Patient deleted successfully.");
+      setDeleteDialogOpen(false);
+      setPatientToDelete(null);
+      setDeleteConfirmText("");
+    } catch (error) {
+      console.error("Error deleting patient:", error);
+      toast.error("Failed to delete patient.");
+    }
+  };
 
   if (loading) {
     return <div className="text-center">Loading patients...</div>;
@@ -78,6 +113,24 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
           ← Back to Patient List
         </Button>
         <PatientXrayManager patient={selectedPatient} />
+      </div>
+    );
+  }
+
+  if (selectedPatient && viewMode === 'certificate') {
+    return (
+      <div>
+        <Button
+          onClick={() => {
+            setSelectedPatient(null);
+            setViewMode('list');
+          }}
+          className="mb-4"
+          variant="outline"
+        >
+          ← Back to Patient List
+        </Button>
+        <DentalCertificateGenerator patient={selectedPatient} />
       </div>
     );
   }
@@ -162,7 +215,7 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
                         )}
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Button
                           onClick={() => {
                             setSelectedPatient(patient);
@@ -178,12 +231,36 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
                           <Button
                             onClick={() => {
                               setSelectedPatient(patient);
+                              setViewMode('certificate');
+                            }}
+                            variant="outline"
+                            size="sm"
+                          >
+                            <FileBadge className="h-4 w-4 mr-1" />
+                            Certificate
+                          </Button>
+                        )}
+                        {showVisits && (
+                          <Button
+                            onClick={() => {
+                              setSelectedPatient(patient);
                               setViewMode('visits');
                             }}
                             className="bg-blue-600 hover:bg-blue-700"
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View Records
+                          </Button>
+                        )}
+                        {canDeletePatients && (
+                          <Button
+                            onClick={() => handleDeletePatient(patient)}
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete Patient
                           </Button>
                         )}
                       </div>
@@ -195,6 +272,48 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
           </div>
         </CardContent>
       </Card>
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Patient Deletion</DialogTitle>
+            <DialogDescription>
+              This will permanently remove patient{" "}
+              <strong>
+                {patientToDelete?.first_name} {patientToDelete?.last_name}
+              </strong>{" "}
+              and related records. Type <strong>DELETE</strong> to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder='Type "DELETE"'
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setPatientToDelete(null);
+                setDeleteConfirmText("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmDeletePatient}
+              disabled={deleteConfirmText.trim() !== "DELETE"}
+            >
+              Delete Patient
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

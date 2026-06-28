@@ -10,7 +10,7 @@ const Index = () => {
 
   useEffect(() => {
     if (!loading) {
-      if (!user || userRole !== 'dentist') {
+      if (!user || !userRole) {
         navigate('/auth');
       }
     }
@@ -29,11 +29,11 @@ const Index = () => {
   }
 
   // Show nothing while redirecting
-  if (!user || userRole !== 'dentist') {
+  if (!user || !userRole) {
     return null;
   }
 
-  return <DentistDashboardFull />;
+  return <DentistDashboardFull mode={userRole as 'admin' | 'dentist'} />;
 };
 
 export default Index;

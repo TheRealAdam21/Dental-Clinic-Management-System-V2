@@ -54,6 +54,22 @@ Create a `.env` file with your Supabase credentials:
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_VAPID_PUBLIC_KEY=your_web_push_vapid_public_key
+```
+
+For scheduled push notifications, also set these in Supabase Edge Function secrets:
+
+```env
+VAPID_PUBLIC_KEY=your_web_push_vapid_public_key
+VAPID_PRIVATE_KEY=your_web_push_vapid_private_key
+VAPID_SUBJECT=mailto:your-email@example.com
+SERVICE_ROLE_KEY=your_service_role_key
+```
+
+Generate VAPID keys locally with:
+
+```bash
+npx web-push generate-vapid-keys
 ```
 
 ## Development
@@ -99,6 +115,20 @@ The app supports full offline functionality:
 - Changes made offline are queued and synced when connection is restored
 - Network status is displayed in the UI
 - Conflict resolution uses last-write-wins strategy
+
+## Scheduled Push Notifications
+
+This project includes:
+
+- Browser push subscription registration (`register-push-subscription` function)
+- Service worker push handlers (`public/push-handler.js`)
+- Scheduler/dispatcher function (`dispatch-appointment-notifications`)
+
+Recommended setup:
+
+1. Run Supabase migrations (includes `push_subscriptions` and dispatch logs).
+2. Deploy both edge functions.
+3. Create a cron job in Supabase to call `dispatch-appointment-notifications` every 5 minutes.
 
 ## License
 

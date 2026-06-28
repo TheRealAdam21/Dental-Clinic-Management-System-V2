@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
@@ -21,26 +21,31 @@ export const NetworkStatus = () => {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (isOnline && pendingSync > 0) {
-      handleSync();
-    }
-  }, [isOnline]);
-
-  const handleSync = async () => {
+  const handleSync = useCallback(async (silent = false) => {
     if (syncing) return;
     
     setSyncing(true);
     try {
       await syncService.syncAll();
-      toast.success('Data synced successfully');
-      setPendingSync(0);
+      const count = await syncService.getPendingSyncCount();
+      setPendingSync(count);
+      if (!silent) {
+        toast.success(count === 0 ? 'Data synced successfully' : 'Sync completed with pending items');
+      }
     } catch (error) {
-      toast.error('Sync failed. Will retry automatically.');
+      if (!silent) {
+        toast.error('Sync failed. Will retry automatically.');
+      }
     } finally {
       setSyncing(false);
     }
-  };
+  }, [syncing]);
+
+  useEffect(() => {
+    if (isOnline && pendingSync > 0) {
+      handleSync(true);
+    }
+  }, [isOnline, pendingSync, handleSync]);
 
   return (
     <div className="flex items-center gap-2">
@@ -65,7 +70,7 @@ export const NetworkStatus = () => {
         <Badge 
           variant="outline"
           className="flex items-center gap-1 cursor-pointer hover:bg-gray-100"
-          onClick={handleSync}
+          onClick={() => handleSync(false)}
         >
           <RefreshCw className={`h-3 w-3 ${syncing ? 'animate-spin' : ''}`} />
           {pendingSync} pending

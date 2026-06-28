@@ -3,18 +3,28 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Users, FileText, LogOut, Stethoscope, UserPlus } from "lucide-react";
-import DentistDashboard from "@/components/DentistDashboard";
 import PatientList from "@/components/PatientList";
 import AppointmentScheduler from "@/components/AppointmentScheduler";
 import PatientForm from "@/components/PatientForm";
 import PatientRecordsAuth from "@/components/PatientRecordsAuth";
+import AdminDentistManager from "@/components/AdminDentistManager";
 import { NetworkStatus } from "@/components/NetworkStatus";
 import { useAuth } from "@/contexts/AuthContext";
+import ThemeToggle from "@/components/ThemeToggle";
+import { useAppointmentNotifications } from "@/hooks/useAppointmentNotifications";
+import { useNativeAppointmentNotifications } from "@/hooks/useNativeAppointmentNotifications";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
-const DentistDashboardFull = () => {
+type DashboardMode = 'admin' | 'dentist';
+
+const DentistDashboardFull = ({ mode }: { mode: DashboardMode }) => {
   const [activeTab, setActiveTab] = useState("appointments");
   const [isRecordsAuthenticated, setIsRecordsAuthenticated] = useState(false);
   const { signOut, user } = useAuth();
+  const isAdmin = mode === 'admin';
+  useAppointmentNotifications(user);
+  useNativeAppointmentNotifications(user);
+  usePushNotifications(user);
 
   const handleSignOut = async () => {
     await signOut();
@@ -29,19 +39,24 @@ const DentistDashboardFull = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-8">
           <div className="flex items-center gap-3">
             <Stethoscope className="h-8 w-8 text-blue-600" />
             <div>
-              <h1 className="text-3xl font-bold text-gray-800">Dental Clinic Management</h1>
-              <p className="text-gray-600">Welcome, Dr. {user?.user_metadata?.first_name || user?.email}!</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100">Dental Clinic Management</h1>
+              <p className="text-gray-600 dark:text-gray-300">
+                {isAdmin
+                  ? "Welcome, Admin!"
+                  : `Welcome, Dr. ${user?.user_metadata?.first_name || user?.email}!`}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <NetworkStatus />
+            <ThemeToggle />
             <Button onClick={handleSignOut} variant="outline">
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
@@ -51,20 +66,22 @@ const DentistDashboardFull = () => {
 
         {/* Navigation Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
-            <TabsTrigger value="appointments" className="flex items-center gap-2">
+          <TabsList className="w-full mb-8 flex overflow-x-auto whitespace-nowrap gap-2 p-1">
+            <TabsTrigger value="appointments" className="flex-none flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               Appointments
             </TabsTrigger>
-            <TabsTrigger value="schedule" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Schedule
-            </TabsTrigger>
-            <TabsTrigger value="patients" className="flex items-center gap-2">
+            <TabsTrigger value="patients" className="flex-none flex items-center gap-2">
               <UserPlus className="h-4 w-4" />
               Add Patient
             </TabsTrigger>
-            <TabsTrigger value="records" className="flex items-center gap-2">
+            {isAdmin && (
+              <TabsTrigger value="dentists" className="flex-none flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Dentists
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="records" className="flex-none flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Patient Records
             </TabsTrigger>
@@ -72,39 +89,39 @@ const DentistDashboardFull = () => {
 
           {/* Appointment Management */}
           <TabsContent value="appointments" className="space-y-6">
-            <DentistDashboard />
-          </TabsContent>
-
-          {/* Appointment Scheduling */}
-          <TabsContent value="schedule" className="space-y-6">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Schedule New Appointment</h2>
-              <p className="text-gray-600">Create appointments for patients</p>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">Appointments</h2>
+              <p className="text-gray-600 dark:text-gray-300">Use calendar date popups to manage and schedule appointments.</p>
             </div>
             <AppointmentScheduler />
           </TabsContent>
 
           {/* Patient Registration */}
           <TabsContent value="patients" className="space-y-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Register New Patient</h2>
-              <p className="text-gray-600">Add patient information to the system</p>
-            </div>
             <PatientForm />
           </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="dentists" className="space-y-6">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">Manage Dentists</h2>
+                <p className="text-gray-600 dark:text-gray-300">Admin can add/edit dentists for appointment scheduling.</p>
+              </div>
+              <AdminDentistManager />
+            </TabsContent>
+          )}
 
           {/* Patient Records with Password Protection */}
           <TabsContent value="records" className="space-y-6">
             {!isRecordsAuthenticated ? (
               <PatientRecordsAuth 
                 onAuthenticated={() => setIsRecordsAuthenticated(true)}
-                userEmail={user?.email || ""}
               />
             ) : (
               <>
                 <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800 mb-2">Patient Records</h2>
-                  <p className="text-gray-600">View and manage patient visits and payments</p>
+                  <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">Patient Records</h2>
+                  <p className="text-gray-600 dark:text-gray-300">View and manage patient visits and payments</p>
                 </div>
                 <PatientList showVisits={true} />
               </>

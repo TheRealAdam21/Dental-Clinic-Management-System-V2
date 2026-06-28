@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export const useAuthGuard = () => {
-  const { user, loading } = useAuth();
+  const { user, userRole, loading } = useAuth();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -15,6 +15,7 @@ export const useAuthGuard = () => {
   return {
     isAuthenticated: !!user,
     isAuthorized: !!user,
+    isAdmin: userRole === 'admin',
     loading
   };
 };

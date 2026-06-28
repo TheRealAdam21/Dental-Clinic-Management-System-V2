@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,32 +9,76 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, X, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { getWatchDirectory, isTauriRuntime, scanInboxForPatient, setWatchDirectory } from "@/lib/tauriXray";
 
 interface XrayImageUploadProps {
   visitId?: string;
+  patientId?: string;
   existingImages?: string[];
   onImagesChange: (images: string[]) => void;
 }
 
-const XrayImageUpload = ({ visitId, existingImages = [], onImagesChange }: XrayImageUploadProps) => {
+const XRAY_INBOX_KEY = "toothtime.xray.inbox.path";
+
+const toSafePathSegment = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+const fileToDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+
+const XrayImageUpload = ({ visitId, patientId, existingImages = [], onImagesChange }: XrayImageUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<string[]>(existingImages);
+  const [scannerInboxPath, setScannerInboxPath] = useState(localStorage.getItem(XRAY_INBOX_KEY) || "");
+  const [autoImportEnabled, setAutoImportEnabled] = useState(false);
+  const [isTauri, setIsTauri] = useState(false);
+  const inboxInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    setImages(existingImages);
+  }, [existingImages]);
+
+  useEffect(() => {
+    const tauri = isTauriRuntime();
+    setIsTauri(tauri);
+    if (!tauri) return;
+
+    getWatchDirectory()
+      .then((dir) => {
+        if (dir) setScannerInboxPath(dir);
+      })
+      .catch(() => {
+        // Keep local fallback value only.
+      });
+  }, []);
 
   const uploadImage = async (file: File) => {
+    const fileExt = file.name.split('.').pop() || "png";
+    const safePatient = toSafePathSegment(patientId || "unassigned");
+    const dateFolder = new Date().toISOString().split("T")[0];
+    const fileName = `${Date.now()}-${Math.random().toString(16).slice(2)}.${fileExt}`;
+    const filePath = `${safePatient}/${dateFolder}/${fileName}`;
+
     try {
       setUploading(true);
-      
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('xrays')
-        .upload(filePath, file);
-
-      if (uploadError) {
-        throw uploadError;
+      if (!supabase) {
+        // Offline/local fallback: keep image as data URL until sync-enabled upload is available.
+        const localUrl = await fileToDataUrl(file);
+        const newImages = [...images, localUrl];
+        setImages(newImages);
+        onImagesChange(newImages);
+        toast.success("X-ray stored locally (offline mode).");
+        return;
       }
+
+      const { error: uploadError } = await supabase.storage.from('xrays').upload(filePath, file);
+      if (uploadError) throw uploadError;
 
       const { data } = supabase.storage
         .from('xrays')
@@ -53,27 +97,92 @@ const XrayImageUpload = ({ visitId, existingImages = [], onImagesChange }: XrayI
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadDataUrlAsImage = async (dataUrl: string, preferredName: string) => {
+    const [meta, base64] = dataUrl.split(",");
+    if (!meta || !base64) return;
+    const mime = meta.match(/data:(.*?);base64/)?.[1] || "image/png";
+    const ext = mime.split("/")[1] || "png";
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const file = new File([bytes], preferredName || `xray-import.${ext}`, { type: mime });
+    await uploadImage(file);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.type.startsWith('image/')) {
-        uploadImage(file);
+        await uploadImage(file);
       } else {
         toast.error("Please select a valid image file.");
       }
     }
+    e.target.value = "";
   };
+
+  const handleInboxImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter((file) => file.type.startsWith("image/"));
+    if (files.length === 0) {
+      toast.error("No image files found in selected folder.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      for (const file of files) {
+        await uploadImage(file);
+      }
+      toast.success(`Imported ${files.length} X-ray image${files.length > 1 ? "s" : ""}.`);
+    } catch (error) {
+      console.error("Inbox import error:", error);
+      toast.error("Some X-ray files failed to import.");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const importFromTauriWatchFolder = async () => {
+    if (!isTauri || !patientId) {
+      toast.error("Tauri auto-import requires a selected patient.");
+      return;
+    }
+    try {
+      const result = await scanInboxForPatient(patientId);
+      if (!result || result.imported_count === 0) return;
+
+      for (let i = 0; i < result.imported_data_urls.length; i++) {
+        const dataUrl = result.imported_data_urls[i];
+        const fileName = result.imported_file_names[i] || `xray-import-${i + 1}.png`;
+        await uploadDataUrlAsImage(dataUrl, fileName);
+      }
+      toast.success(`Auto-imported ${result.imported_count} X-ray image${result.imported_count > 1 ? "s" : ""}.`);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to scan watched X-ray folder.");
+    }
+  };
+
+  useEffect(() => {
+    if (!isTauri || !autoImportEnabled || !patientId) return;
+    const interval = window.setInterval(() => {
+      importFromTauriWatchFolder().catch(() => {});
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [isTauri, autoImportEnabled, patientId]);
 
   const removeImage = async (imageUrl: string, index: number) => {
     try {
-      // Extract the file path from the URL
-      const urlParts = imageUrl.split('/');
-      const fileName = urlParts[urlParts.length - 1];
-      
-      // Delete from storage
-      await supabase.storage
-        .from('xrays')
-        .remove([fileName]);
+      if (supabase && imageUrl.startsWith("http")) {
+        const marker = "/storage/v1/object/public/xrays/";
+        const markerIndex = imageUrl.indexOf(marker);
+        if (markerIndex !== -1) {
+          const filePath = imageUrl.slice(markerIndex + marker.length);
+          await supabase.storage
+            .from('xrays')
+            .remove([filePath]);
+        }
+      }
 
       const newImages = images.filter((_, i) => i !== index);
       setImages(newImages);
@@ -88,6 +197,49 @@ const XrayImageUpload = ({ visitId, existingImages = [], onImagesChange }: XrayI
 
   return (
     <div className="space-y-4">
+      <div className="rounded-md border p-3 bg-muted/20">
+        <Label htmlFor={`xray-inbox-${visitId || patientId || "global"}`} className="block text-sm font-medium mb-2">
+          X-ray Scanner Inbox (Source Folder)
+        </Label>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input
+            id={`xray-inbox-${visitId || patientId || "global"}`}
+            value={scannerInboxPath}
+            onChange={(e) => setScannerInboxPath(e.target.value)}
+            placeholder="Example: /Scans/XrayInbox (label/reference only)"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              localStorage.setItem(XRAY_INBOX_KEY, scannerInboxPath.trim());
+              if (isTauri) {
+                setWatchDirectory(scannerInboxPath.trim()).catch((error: any) =>
+                  toast.error(error?.message || "Failed to save Tauri watch directory.")
+                );
+              }
+              toast.success("Scanner inbox location saved.");
+            }}
+          >
+            Save Location
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          {isTauri
+            ? "For Tauri desktop: save folder once, then use Auto-import or Scan Now."
+            : "Use \"Import from Scanner Folder\" below to pick files from that location and auto-assign them to this patient."}
+        </p>
+        {isTauri && patientId && (
+          <div className="flex flex-col sm:flex-row gap-2 mt-2">
+            <Button type="button" variant={autoImportEnabled ? "default" : "outline"} onClick={() => setAutoImportEnabled((v) => !v)}>
+              {autoImportEnabled ? "Auto-import: ON" : "Auto-import: OFF"}
+            </Button>
+            <Button type="button" variant="outline" onClick={importFromTauriWatchFolder}>
+              Scan Watched Folder Now
+            </Button>
+          </div>
+        )}
+      </div>
       <div>
         <Label htmlFor="xray-upload" className="block text-sm font-medium mb-2">
           X-ray Images
@@ -100,16 +252,34 @@ const XrayImageUpload = ({ visitId, existingImages = [], onImagesChange }: XrayI
             onChange={handleFileChange}
             disabled={uploading}
             className="hidden"
+            ref={uploadInputRef}
+          />
+          <Input
+            type="file"
+            accept="image/*"
+            onChange={handleInboxImport}
+            disabled={uploading}
+            className="hidden"
+            ref={inboxInputRef}
+            multiple
           />
           <Button
             type="button"
             variant="outline"
-            onClick={() => document.getElementById('xray-upload')?.click()}
+            onClick={() => uploadInputRef.current?.click()}
             disabled={uploading}
             className="flex items-center gap-2"
           >
             <Upload className="h-4 w-4" />
             {uploading ? 'Uploading...' : 'Upload X-ray'}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => inboxInputRef.current?.click()}
+            disabled={uploading}
+          >
+            Import from Scanner Folder
           </Button>
         </div>
       </div>

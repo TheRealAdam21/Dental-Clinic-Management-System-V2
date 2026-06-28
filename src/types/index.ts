@@ -16,10 +16,13 @@ export interface Patient {
   gender?: string;
   created_at?: string;
   updated_at?: string;
+  xray_images?: string[] | null;
 }
 
 export interface Dentist {
   id: string;
+  username: string;
+  password: string;
   first_name: string;
   last_name: string;
   specialization?: string;
@@ -76,11 +79,15 @@ export interface MedicalHistory {
 export interface Visit {
   id: string;
   patient_id: string;
-  appointment_id: string;
+  appointment_id?: string;
   visit_date: string;
-  treatment_provided: string;
+  diagnosis?: string;
+  treatment?: string;
+  treatment_provided?: string;
+  treatment_cost?: number | null;
   notes?: string;
   amount_charged?: number;
+  xray_images?: string[] | null;
   created_at?: string;
 }
 

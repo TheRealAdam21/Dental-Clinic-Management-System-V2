@@ -8,17 +8,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { FileText, Plus, Calendar, DollarSign, History, Image as ImageIcon } from "lucide-react";
+import { FileText, Plus, Calendar, DollarSign, History, Image as ImageIcon, ScanLine } from "lucide-react";
 import MedicalHistoryDisplay from "./MedicalHistoryDisplay";
 import XrayImageUpload from "./XrayImageUpload";
+import PatientRecordScanner from "./PatientRecordScanner";
+import { dataService } from "@/services/dataService";
+import type { Patient, Visit } from "@/types";
 
 interface VisitTrackerProps {
-  patient: any;
+  patient: Patient;
 }
 
 const VisitTracker = ({ patient }: VisitTrackerProps) => {
-  const [visits, setVisits] = useState<any[]>([]);
+  const [visits, setVisits] = useState<Visit[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
     visit_date: "",
@@ -28,22 +30,18 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
     notes: ""
   });
   const [xrayImages, setXrayImages] = useState<string[]>([]);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
     fetchVisits();
   }, [patient.id]);
 
   const fetchVisits = async () => {
-    const { data, error } = await supabase
-      .from('visits')
-      .select('*')
-      .eq('patient_id', patient.id)
-      .order('visit_date', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching visits:', error);
-    } else {
+    try {
+      const data = await dataService.getVisitsByPatient(patient.id);
       setVisits(data || []);
+    } catch (error) {
+      console.error('Error fetching visits:', error);
     }
   };
 
@@ -59,16 +57,17 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
     e.preventDefault();
     
     try {
-      const { error } = await supabase
-        .from('visits')
-        .insert([{
-          ...formData,
-          patient_id: patient.id,
-          treatment_cost: formData.treatment_cost ? parseFloat(formData.treatment_cost) : null,
-          xray_images: xrayImages.length > 0 ? xrayImages : null
-        }]);
-
-      if (error) throw error;
+      await dataService.addVisit({
+        patient_id: patient.id,
+        visit_date: formData.visit_date,
+        diagnosis: formData.diagnosis,
+        treatment: formData.treatment,
+        treatment_provided: formData.treatment,
+        treatment_cost: formData.treatment_cost ? parseFloat(formData.treatment_cost) : null,
+        amount_charged: formData.treatment_cost ? parseFloat(formData.treatment_cost) : undefined,
+        notes: formData.notes || undefined,
+        xray_images: xrayImages.length > 0 ? xrayImages : null
+      });
 
       toast.success("Visit record added successfully!");
       setFormData({
@@ -119,6 +118,14 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
                 </DialogContent>
               </Dialog>
               
+              <Button
+                variant="outline"
+                onClick={() => setScannerOpen(true)}
+              >
+                <ScanLine className="h-4 w-4 mr-1" />
+                Scan Visits
+              </Button>
+
               <Button
                 onClick={() => setShowAddForm(!showAddForm)}
                 className="bg-blue-600 hover:bg-blue-700"
@@ -195,6 +202,7 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
                   </div>
 
                   <XrayImageUpload
+                    patientId={patient.id}
                     existingImages={xrayImages}
                     onImagesChange={handleXrayImagesChange}
                   />
@@ -231,9 +239,9 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {visit.treatment_cost && (
+                        {visit.treatment_cost != null && visit.treatment_cost !== 0 && (
                           <Badge className="bg-green-100 text-green-800">
-                            <DollarSign className="h-3 w-3 mr-1" />
+                            
                             {formatCurrency(visit.treatment_cost)}
                           </Badge>
                         )}
@@ -254,7 +262,7 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
 
                       <div>
                         <h4 className="font-semibold text-sm text-gray-700">Treatment:</h4>
-                        <p className="text-sm">{visit.treatment}</p>
+                        <p className="text-sm">{visit.treatment ?? visit.treatment_provided}</p>
                       </div>
 
                       {visit.notes && (
@@ -269,6 +277,7 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
                           <h4 className="font-semibold text-sm text-gray-700 mb-2">X-ray Images:</h4>
                           <XrayImageUpload
                             visitId={visit.id}
+                            patientId={patient.id}
                             existingImages={visit.xray_images}
                             onImagesChange={() => {}} // Read-only mode for existing visits
                           />
@@ -282,6 +291,14 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
           </div>
         </CardContent>
       </Card>
+
+      <PatientRecordScanner
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        mode="visits"
+        patientId={patient.id}
+        onSaved={fetchVisits}
+      />
     </div>
   );
 };

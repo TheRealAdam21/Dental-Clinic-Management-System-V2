@@ -5,51 +5,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { Shield } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface PatientRecordsAuthProps {
   onAuthenticated: () => void;
-  userEmail: string;
 }
 
-const PatientRecordsAuth = ({ onAuthenticated, userEmail }: PatientRecordsAuthProps) => {
+const PatientRecordsAuth = ({ onAuthenticated }: PatientRecordsAuthProps) => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const { verifyPassword } = useAuth();
 
   const handleVerifyPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Get current session to verify we're authenticated
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.user) {
-        toast.error("You must be logged in to access patient records");
-        setLoading(false);
-        return;
-      }
-
-      // Verify password matches current user's password
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: userEmail,
-        password: password,
-      });
-
-      if (error) {
-        toast.error("Invalid password");
-      } else if (data.user?.id === session.user.id) {
+      const isValid = await verifyPassword(password);
+      if (isValid) {
         toast.success("Access granted to patient records");
         onAuthenticated();
       } else {
-        toast.error("Authentication failed");
+        toast.error("Invalid password");
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error("Authentication failed");
     } finally {
       setLoading(false);
-      setPassword(""); // Clear password field
+      setPassword("");
     }
   };
 

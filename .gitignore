@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+.env.vercel
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -24,3 +30,19 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Tauri / Rust build output
+src-tauri/target
+
+# Android build artifacts
+android/.gradle
+android/app/build
+android/build
+android/local.properties
+
+# Database backups and local temp
+db_cluster*/
+supabase/.temp
+
+# OS
+Thumbs.db

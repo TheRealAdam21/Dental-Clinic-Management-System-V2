@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
 import { FileText, User, Phone } from "lucide-react";
+import { dataService } from "@/services/dataService";
+import type { MedicalHistory } from "@/types";
 
 interface MedicalHistoryDisplayProps {
   patientId: string;
 }
 
 const MedicalHistoryDisplay = ({ patientId }: MedicalHistoryDisplayProps) => {
-  const [medicalHistory, setMedicalHistory] = useState<any>(null);
+  const [medicalHistory, setMedicalHistory] = useState<MedicalHistory | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,17 +19,8 @@ const MedicalHistoryDisplay = ({ patientId }: MedicalHistoryDisplayProps) => {
 
   const fetchMedicalHistory = async () => {
     try {
-      const { data, error } = await supabase
-        .from('medical_history')
-        .select('*')
-        .eq('patient_id', patientId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching medical history:', error);
-      } else {
-        setMedicalHistory(data);
-      }
+      const data = await dataService.getMedicalHistory(patientId);
+      setMedicalHistory(data ?? null);
     } catch (error) {
       console.error('Error:', error);
     } finally {

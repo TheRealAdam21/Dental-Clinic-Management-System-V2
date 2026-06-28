@@ -65,11 +65,21 @@ const AppointmentRescheduleModal = ({
 
   const formatCurrentDateTime = () => {
     if (!appointment?.appointment_datetime) return { date: '', time: '' };
-    
-    const date = new Date(appointment.appointment_datetime);
+
+    const [rawDate, rawTime = ""] = appointment.appointment_datetime.split("T");
+    const [year, month, day] = rawDate.split("-").map(Number);
+    const date = new Date(year, (month || 1) - 1, day || 1);
+    const hhmm = rawTime.slice(0, 5);
+    let displayTime = "--:--";
+    if (hhmm.includes(":")) {
+      const [h, m] = hhmm.split(":").map(Number);
+      const hour12 = h % 12 || 12;
+      const suffix = h >= 12 ? "PM" : "AM";
+      displayTime = `${hour12}:${`${m}`.padStart(2, "0")} ${suffix}`;
+    }
     return {
       date: date.toLocaleDateString(),
-      time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: displayTime
     };
   };
 

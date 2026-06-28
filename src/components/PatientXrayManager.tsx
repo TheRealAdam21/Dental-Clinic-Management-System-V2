@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { Image as ImageIcon, Plus } from "lucide-react";
 import XrayImageUpload from "./XrayImageUpload";
+import { dataService } from "@/services/dataService";
+import type { Patient } from "@/types";
 
 interface PatientXrayManagerProps {
-  patient: any;
+  patient: Patient;
 }
 
 const PatientXrayManager = ({ patient }: PatientXrayManagerProps) => {
@@ -22,34 +23,20 @@ const PatientXrayManager = ({ patient }: PatientXrayManagerProps) => {
   }, [patient.id]);
 
   const fetchPatientXrays = async () => {
-    const { data, error } = await supabase
-      .from('patients')
-      .select('xray_images')
-      .eq('id', patient.id)
-      .single();
-
-    if (error) {
-      console.error('Error fetching patient X-rays:', error);
-    } else {
-      setPatientXrays(data?.xray_images || []);
-    }
+    const fresh = await dataService.getPatientById(patient.id);
+    setPatientXrays(fresh?.xray_images || []);
   };
 
   const handleXrayImagesChange = async (images: string[]) => {
     setPatientXrays(images);
     
-    // Update the patient record with new X-ray images
-    const { error } = await supabase
-      .from('patients')
-      .update({ xray_images: images })
-      .eq('id', patient.id);
-
-    if (error) {
-      console.error('Error updating patient X-rays:', error);
-      toast.error("Failed to update patient X-rays");
-    } else {
+    try {
+      await dataService.updatePatient(patient.id, { xray_images: images });
       toast.success("Patient X-rays updated successfully!");
       setShowUploadDialog(false);
+    } catch (error) {
+      console.error('Error updating patient X-rays:', error);
+      toast.error("Failed to update patient X-rays");
     }
   };
 
@@ -73,6 +60,7 @@ const PatientXrayManager = ({ patient }: PatientXrayManagerProps) => {
                 <DialogTitle>Manage X-ray Images - {patient.first_name} {patient.last_name}</DialogTitle>
               </DialogHeader>
               <XrayImageUpload
+                patientId={patient.id}
                 existingImages={patientXrays}
                 onImagesChange={handleXrayImagesChange}
               />
@@ -100,6 +88,7 @@ const PatientXrayManager = ({ patient }: PatientXrayManagerProps) => {
                   <DialogTitle>X-ray Images - {patient.first_name} {patient.last_name}</DialogTitle>
                 </DialogHeader>
                 <XrayImageUpload
+                  patientId={patient.id}
                   existingImages={patientXrays}
                   onImagesChange={() => {}} // Read-only mode
                 />

@@ -8,9 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
+import { ScanLine } from "lucide-react";
 import { DataService } from "@/services/dataService";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { patientSchema, medicalHistorySchema } from "@/lib/validationSchemas";
+import PatientRecordScanner from "@/components/PatientRecordScanner";
+import type { ParsedVisit } from "@/lib/recordParser";
 
 const dataService = new DataService();
 
@@ -60,6 +63,8 @@ const PatientForm = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [includeMedicalHistory, setIncludeMedicalHistory] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannedVisits, setScannedVisits] = useState<ParsedVisit[]>([]);
 
   const handleInputChange = (field: string, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -72,6 +77,69 @@ const PatientForm = () => {
         ? [...(prev[field as keyof typeof prev] as string[]), value]
         : (prev[field as keyof typeof prev] as string[]).filter(item => item !== value)
     }));
+  };
+
+  const handleScanApply = (data: {
+    patient: Record<string, string | string[]>;
+    medicalHistory: Record<string, string | string[]>;
+    visits: ParsedVisit[];
+  }) => {
+    setFormData((prev) => ({
+      ...prev,
+      first_name: String(data.patient.first_name ?? prev.first_name),
+      last_name: String(data.patient.last_name ?? prev.last_name),
+      email: String(data.patient.email ?? prev.email),
+      phone: String(data.patient.phone ?? prev.phone),
+      date_of_birth: String(data.patient.date_of_birth ?? prev.date_of_birth),
+      age: String(data.patient.age ?? prev.age),
+      occupation: String(data.patient.occupation ?? prev.occupation),
+      marital_status: String(data.patient.marital_status ?? prev.marital_status),
+      address: String(data.patient.address ?? prev.address),
+      emergency_contact_name: String(data.patient.emergency_contact_name ?? prev.emergency_contact_name),
+      emergency_contact_phone: String(data.patient.emergency_contact_phone ?? prev.emergency_contact_phone),
+      insurance_provider: String(data.patient.insurance_provider ?? prev.insurance_provider),
+      insurance_policy_number: String(data.patient.insurance_policy_number ?? prev.insurance_policy_number),
+      gender: String(data.patient.gender ?? prev.gender),
+      physician_name: String(data.medicalHistory.physician_name ?? prev.physician_name),
+      physician_specialty: String(data.medicalHistory.physician_specialty ?? prev.physician_specialty),
+      physician_address: String(data.medicalHistory.physician_address ?? prev.physician_address),
+      physician_phone: String(data.medicalHistory.physician_phone ?? prev.physician_phone),
+      in_good_health: String(data.medicalHistory.in_good_health ?? prev.in_good_health),
+      in_medical_treatment: String(data.medicalHistory.in_medical_treatment ?? prev.in_medical_treatment),
+      treatment_condition: String(data.medicalHistory.treatment_condition ?? prev.treatment_condition),
+      serious_illness: String(data.medicalHistory.serious_illness ?? prev.serious_illness),
+      illness_description: String(data.medicalHistory.illness_description ?? prev.illness_description),
+      hospitalized: String(data.medicalHistory.hospitalized ?? prev.hospitalized),
+      hospitalization_details: String(data.medicalHistory.hospitalization_details ?? prev.hospitalization_details),
+      taking_medication: String(data.medicalHistory.taking_medication ?? prev.taking_medication),
+      medication_details: String(data.medicalHistory.medication_details ?? prev.medication_details),
+      uses_tobacco: String(data.medicalHistory.uses_tobacco ?? prev.uses_tobacco),
+      uses_alcohol_drugs: String(data.medicalHistory.uses_alcohol_drugs ?? prev.uses_alcohol_drugs),
+      allergies: Array.isArray(data.medicalHistory.allergies)
+        ? data.medicalHistory.allergies
+        : prev.allergies,
+      other_allergy: String(data.medicalHistory.other_allergy ?? prev.other_allergy),
+      bleeding_time: String(data.medicalHistory.bleeding_time ?? prev.bleeding_time),
+      is_pregnant: String(data.medicalHistory.is_pregnant ?? prev.is_pregnant),
+      is_nursing: String(data.medicalHistory.is_nursing ?? prev.is_nursing),
+      taking_birth_control: String(data.medicalHistory.taking_birth_control ?? prev.taking_birth_control),
+      blood_type: String(data.medicalHistory.blood_type ?? prev.blood_type),
+      blood_pressure: String(data.medicalHistory.blood_pressure ?? prev.blood_pressure),
+      medical_conditions: Array.isArray(data.medicalHistory.medical_conditions)
+        ? data.medicalHistory.medical_conditions
+        : prev.medical_conditions,
+    }));
+
+    const hasMedicalHistory = Object.entries(data.medicalHistory).some(([key, value]) => {
+      if (key === "allergies" || key === "medical_conditions") {
+        return Array.isArray(value) && value.length > 0;
+      }
+      return String(value ?? "").trim().length > 0;
+    });
+    if (hasMedicalHistory) {
+      setIncludeMedicalHistory(true);
+    }
+    setScannedVisits(data.visits);
   };
 
   const allergyOptions = [
@@ -165,7 +233,27 @@ const PatientForm = () => {
         await dataService.addMedicalHistory(medicalHistoryData);
       }
 
-      toast.success("Patient registered successfully!");
+      const validScannedVisits = scannedVisits.filter(
+        (visit) => visit.visit_date && visit.treatment
+      );
+      for (const visit of validScannedVisits) {
+        await dataService.addVisit({
+          patient_id: patientResult.id,
+          visit_date: visit.visit_date,
+          diagnosis: visit.diagnosis || undefined,
+          treatment: visit.treatment,
+          treatment_provided: visit.treatment,
+          treatment_cost: visit.treatment_cost,
+          amount_charged: visit.treatment_cost ?? undefined,
+          notes: visit.notes || undefined,
+        });
+      }
+
+      toast.success(
+        validScannedVisits.length > 0
+          ? `Patient registered with ${validScannedVisits.length} imported visit record(s)!`
+          : "Patient registered successfully!"
+      );
       
       // Reset form
       setFormData({
@@ -209,6 +297,7 @@ const PatientForm = () => {
         medical_conditions: []
       });
       setIncludeMedicalHistory(false);
+      setScannedVisits([]);
     } catch (error: any) {
       if (error.name === 'ZodError') {
         const fieldErrors = error.errors.map((err: any) => `${err.path.join('.')}: ${err.message}`).join(', ');
@@ -236,6 +325,77 @@ const PatientForm = () => {
   }
 
   return (
+    <>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Register New Patient</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Fill out the form manually or scan an existing physical record.
+          </p>
+        </div>
+        <Button type="button" variant="outline" onClick={() => setScannerOpen(true)}>
+          <ScanLine className="h-4 w-4 mr-2" />
+          Scan Physical Record
+        </Button>
+      </div>
+
+      {scannedVisits.length > 0 && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-900 px-4 py-3 text-sm">
+          {scannedVisits.length} visit record(s) from the scan will be imported when you register this patient.
+        </div>
+      )}
+
+      <PatientRecordScanner
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        mode="patient"
+        onApplyToForm={handleScanApply}
+        onSaved={() => {
+          setScannedVisits([]);
+          setFormData({
+            first_name: "",
+            last_name: "",
+            email: "",
+            phone: "",
+            date_of_birth: "",
+            age: "",
+            occupation: "",
+            marital_status: "",
+            address: "",
+            emergency_contact_name: "",
+            emergency_contact_phone: "",
+            insurance_provider: "",
+            insurance_policy_number: "",
+            gender: "",
+            physician_name: "",
+            physician_specialty: "",
+            physician_address: "",
+            physician_phone: "",
+            in_good_health: "",
+            in_medical_treatment: "",
+            treatment_condition: "",
+            serious_illness: "",
+            illness_description: "",
+            hospitalized: "",
+            hospitalization_details: "",
+            taking_medication: "",
+            medication_details: "",
+            uses_tobacco: "",
+            uses_alcohol_drugs: "",
+            allergies: [],
+            other_allergy: "",
+            bleeding_time: "",
+            is_pregnant: "",
+            is_nursing: "",
+            taking_birth_control: "",
+            blood_type: "",
+            blood_pressure: "",
+            medical_conditions: [],
+          });
+          setIncludeMedicalHistory(false);
+        }}
+      />
+
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Personal Information */}
@@ -751,6 +911,7 @@ const PatientForm = () => {
         {isSubmitting ? "Registering..." : "Register Patient"}
       </Button>
     </form>
+    </>
   );
 };
 
