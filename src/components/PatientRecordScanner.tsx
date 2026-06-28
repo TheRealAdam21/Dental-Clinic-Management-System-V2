@@ -115,30 +115,67 @@ const PatientRecordScanner = ({
       });
 
       const parsed = parsePatientRecordText(text);
+      const patientFieldMap = Object.fromEntries(
+        Object.entries(parsed.patient).map(([key, value]) => [
+          key,
+          Array.isArray(value) ? value.join(", ") : String(value ?? ""),
+        ])
+      );
+
+      if (patientFieldMap.date_of_birth && !patientFieldMap.age) {
+        const dob = new Date(patientFieldMap.date_of_birth);
+        if (!Number.isNaN(dob.getTime())) {
+          const age = Math.floor(
+            (Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+          );
+          if (age >= 0) patientFieldMap.age = String(age);
+        }
+      }
+
+      const medicalFieldMap = Object.fromEntries(
+        Object.entries(parsed.medicalHistory).map(([key, value]) => [
+          key,
+          Array.isArray(value) ? value.join(", ") : String(value ?? ""),
+        ])
+      );
+      const parsedVisits =
+        parsed.visits.length > 0 ? parsed.visits : mode === "visits" ? [emptyVisit()] : [];
+
       setRawText(parsed.rawText);
-      setPatientFields(
-        Object.fromEntries(
-          Object.entries(parsed.patient).map(([key, value]) => [
-            key,
-            Array.isArray(value) ? value.join(", ") : String(value ?? ""),
-          ])
-        )
-      );
-      setMedicalFields(
-        Object.fromEntries(
-          Object.entries(parsed.medicalHistory).map(([key, value]) => [
-            key,
-            Array.isArray(value) ? value.join(", ") : String(value ?? ""),
-          ])
-        )
-      );
-      setVisits(parsed.visits.length > 0 ? parsed.visits : [emptyVisit()]);
+      setPatientFields(patientFieldMap);
+      setMedicalFields(medicalFieldMap);
+      setVisits(parsedVisits);
       setStep("review");
 
-      if (!parsed.patient.first_name && !parsed.patient.last_name && parsed.visits.length === 0) {
+      const hasPatientData = Boolean(
+        patientFieldMap.first_name ||
+          patientFieldMap.last_name ||
+          patientFieldMap.phone ||
+          patientFieldMap.date_of_birth
+      );
+
+      if (onApplyToForm && mode === "patient" && hasPatientData) {
+        onApplyToForm({
+          patient: patientFieldMap,
+          medicalHistory: {
+            ...medicalFieldMap,
+            allergies: medicalFieldMap.allergies
+              ? medicalFieldMap.allergies.split(",").map((item) => item.trim()).filter(Boolean)
+              : [],
+            medical_conditions: medicalFieldMap.medical_conditions
+              ? medicalFieldMap.medical_conditions.split(",").map((item) => item.trim()).filter(Boolean)
+              : [],
+          },
+          visits: parsedVisits.filter((visit) => visit.visit_date || visit.treatment),
+        });
+      }
+
+      if (!hasPatientData && parsed.visits.length === 0) {
         toast.warning(
           "Could not confidently read the record. Review and edit the fields manually."
         );
+      } else if (onApplyToForm && mode === "patient" && hasPatientData) {
+        toast.success("Record scanned and applied to the form. Review the details below.");
       } else {
         toast.success("Record scanned. Review the extracted details before saving.");
       }
@@ -433,12 +470,20 @@ const PatientRecordScanner = ({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Visit Records</h3>
-                <Button type="button" size="sm" variant="outline" onClick={() => setVisits((current) => [...current, emptyVisit()])}>
-                  Add Visit
-                </Button>
+                {(visits.length > 0 || mode === "visits") && (
+                  <Button type="button" size="sm" variant="outline" onClick={() => setVisits((current) => [...current, emptyVisit()])}>
+                    Add Visit
+                  </Button>
+                )}
               </div>
 
-              {visits.map((visit, index) => (
+              {visits.length === 0 && mode === "patient" ? (
+                <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-4">
+                  No visit history was detected in this scan. Patient details were extracted above — use
+                  &quot;Apply to Form&quot; or close and check the registration form.
+                </p>
+              ) : (
+                visits.map((visit, index) => (
                 <div key={`visit-${index}`} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <Badge variant="secondary">Visit {index + 1}</Badge>
@@ -490,7 +535,8 @@ const PatientRecordScanner = ({
                     </div>
                   </div>
                 </div>
-              ))}
+              ))
+              )}
             </div>
 
             <div>

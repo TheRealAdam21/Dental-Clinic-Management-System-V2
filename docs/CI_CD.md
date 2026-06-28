@@ -77,6 +77,20 @@ git push to main
 - **Live URL:** https://tooth-time-dental.vercel.app
 - **Env vars:** Vercel → tooth-time-dental → Settings → Environment Variables
 
+#### Require CI before production (Deployment Checks)
+
+This is **not** on the Git settings page. Use:
+
+**Vercel → tooth-time-dental → Settings → Deployment Checks → Add Checks**
+
+1. Choose **GitHub** as the provider
+2. Select the **CI** workflow / `web` job check
+3. Save
+
+After that, production deploys still build on every `main` push, but your live domain only updates after CI tests pass.
+
+If you do not see Deployment Checks, your Vercel plan or GitHub app permissions may need updating — use PR preview URLs and only merge when GitHub Actions is green as a manual fallback.
+
 #### Troubleshooting Vercel deploys
 
 | Problem | Fix |

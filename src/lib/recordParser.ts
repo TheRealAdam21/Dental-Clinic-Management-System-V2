@@ -48,8 +48,8 @@ const extractPhone = (text: string): string => {
     if (digits.length >= 10) return digits;
   }
 
-  const match = text.match(/(?:\+63|0)?9\d{9}|(?:\+63|0)?\d{10,11}/);
-  return match?.[0]?.replace(/[^\d+]/g, "") ?? "";
+  const match = text.match(/\b(0?9\d{9})\b/);
+  return match?.[1]?.replace(/[^\d]/g, "") ?? "";
 };
 
 const extractEmail = (text: string): string => {
@@ -84,7 +84,93 @@ const parseDateToIso = (value: string): string => {
   return "";
 };
 
-const extractNameParts = (text: string): { first_name: string; last_name: string } => {
+const UI_NOISE_LINE =
+  /^(?:patient records?|search patients|view reco|register new patient|dental clinic|access portal|login|appointments?|manage dentists?)$/i;
+
+const isUiNoiseLine = (line: string): boolean => {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.length < 3) return true;
+  if (UI_NOISE_LINE.test(trimmed)) return true;
+  if (/^search patients by/i.test(trimmed)) return true;
+  if (/^(?:x-?rays?|certificate|view reco)/i.test(trimmed)) return true;
+  if (/^[^A-Za-z0-9]+$/.test(trimmed)) return true;
+  return false;
+};
+
+const extractDateFromText = (text: string): string => {
+  const labeled = extractLabelValue(text, [
+    "date of birth",
+    "dob",
+    "birth date",
+    "birthdate",
+  ]);
+  if (labeled) return parseDateToIso(labeled);
+
+  const match = text.match(/(?:^|\s)(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})(?:\s|$)/);
+  if (match?.[1]) return parseDateToIso(match[1]);
+
+  return "";
+};
+
+const extractGenderFromText = (text: string): string => {
+  const labeled = extractLabelValue(text, ["gender", "sex"]).toLowerCase();
+  if (labeled.includes("f")) return "female";
+  if (labeled.includes("m")) return "male";
+  if (labeled.includes("other")) return "other";
+
+  if (/\bfemale\b/i.test(text)) return "female";
+  if (/\bmale\b/i.test(text)) return "male";
+  return "";
+};
+
+const parseNameLine = (
+  line: string
+): { first_name: string; last_name: string; gender?: string } | null => {
+  const cleaned = line
+    .replace(/^[^A-Za-z]+/, "")
+    .replace(/[^A-Za-z\s'.-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned || isUiNoiseLine(cleaned)) return null;
+
+  const withGender = cleaned.match(
+    /^([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,3})\s+(male|female|other)$/i
+  );
+  if (withGender) {
+    const nameParts = withGender[1].trim().split(/\s+/).filter(Boolean);
+    if (nameParts.length >= 2) {
+      return {
+        first_name: nameParts[0],
+        last_name: nameParts.slice(1).join(" "),
+        gender: withGender[2].toLowerCase(),
+      };
+    }
+  }
+
+  if (cleaned.includes(",")) {
+    const [last, first] = cleaned.split(",").map((part) => part.trim());
+    if (first && last) {
+      return { first_name: first, last_name: last };
+    }
+  }
+
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length < 2 || parts.length > 4) return null;
+  if (!parts.every((part) => /^[A-Za-z][A-Za-z'.-]*$/.test(part))) return null;
+  if (["patient", "records", "search", "email", "phone", "view", "name"].includes(parts[0].toLowerCase())) {
+    return null;
+  }
+
+  return {
+    first_name: parts[0],
+    last_name: parts.slice(1).join(" "),
+  };
+};
+
+const extractNameParts = (
+  text: string
+): { first_name: string; last_name: string; gender?: string } => {
   const fullName = extractLabelValue(text, [
     "patient name",
     "name of patient",
@@ -98,12 +184,8 @@ const extractNameParts = (text: string): { first_name: string; last_name: string
       return { first_name: first ?? "", last_name: last ?? "" };
     }
 
-    const parts = fullName.split(/\s+/).filter(Boolean);
-    if (parts.length === 1) return { first_name: parts[0], last_name: "" };
-    return {
-      first_name: parts[0],
-      last_name: parts.slice(1).join(" "),
-    };
+    const parsed = parseNameLine(fullName);
+    if (parsed) return parsed;
   }
 
   const lines = text
@@ -112,15 +194,10 @@ const extractNameParts = (text: string): { first_name: string; last_name: string
     .filter((line) => line.length >= 3);
 
   for (const line of lines) {
-    const cleaned = line.replace(/[^A-Za-z\s'.-]/g, " ").replace(/\s+/g, " ").trim();
-    const parts = cleaned.split(/\s+/).filter(Boolean);
-    if (parts.length < 2 || parts.length > 5) continue;
-    if (!parts.every((part) => /^[A-Za-z][A-Za-z'.-]*$/.test(part))) continue;
-
-    return {
-      first_name: parts[0],
-      last_name: parts.slice(1).join(" "),
-    };
+    const parsed = parseNameLine(line);
+    if (parsed?.first_name && parsed?.last_name) {
+      return parsed;
+    }
   }
 
   return { first_name: "", last_name: "" };
@@ -243,25 +320,15 @@ const parseVisits = (text: string): ParsedVisit[] => {
 
 export const parsePatientRecordText = (rawText: string): ParsedPatientRecord => {
   const text = normalizeText(rawText);
-  const { first_name, last_name } = extractNameParts(text);
-
-  const genderRaw = extractLabelValue(text, ["gender", "sex"]).toLowerCase();
-  const gender = genderRaw.includes("f")
-    ? "female"
-    : genderRaw.includes("m")
-      ? "male"
-      : genderRaw.includes("other")
-        ? "other"
-        : "";
+  const { first_name, last_name, gender: nameGender } = extractNameParts(text);
+  const gender = nameGender || extractGenderFromText(text);
 
   const patient: Record<string, string | string[]> = {
     first_name,
     last_name,
     email: extractEmail(text),
     phone: extractPhone(text),
-    date_of_birth: parseDateToIso(
-      extractLabelValue(text, ["date of birth", "dob", "birth date", "birthdate"])
-    ),
+    date_of_birth: extractDateFromText(text),
     age: extractLabelValue(text, ["age"]).replace(/[^\d]/g, ""),
     occupation: extractLabelValue(text, ["occupation", "job", "work"]),
     marital_status: extractLabelValue(text, ["marital status", "civil status"]).toLowerCase(),

@@ -22,4 +22,21 @@ describe("recordParser", () => {
     expect(parsed.patient.first_name).toBe("Maria");
     expect(parsed.patient.last_name).toBe("Santos");
   });
+
+  it("extracts patient card data from noisy UI screenshot OCR", () => {
+    const parsed = parsePatientRecordText(`
+= Patient Records
+Search patients by name, email. or phone...
+& Adam Cortez male
+Ss 09611734377
+8 7/14/2006
+2) X-rays a) Certificate View Reco,
+    `);
+
+    expect(parsed.patient.first_name).toBe("Adam");
+    expect(parsed.patient.last_name).toBe("Cortez");
+    expect(parsed.patient.phone).toBe("09611734377");
+    expect(parsed.patient.date_of_birth).toBe("2006-07-14");
+    expect(parsed.patient.gender).toBe("male");
+  });
 });
