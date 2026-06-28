@@ -62,7 +62,7 @@ const Auth = () => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">Loading clinic data...</p>
         </div>
       </div>
     );
@@ -77,13 +77,14 @@ const Auth = () => {
             <h1 className="text-3xl font-bold text-gray-800">Dental Clinic</h1>
           </div>
           <p className="text-gray-600">Access Portal</p>
+          <p className="text-sm text-gray-500 mt-2">Dentist accounts load from the cloud when you open this page.</p>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>Login</CardTitle>
             <CardDescription>
-              Admin: username <strong>admin</strong>. Dentist accounts sync from the cloud on web.
+              Admin username: <strong>admin</strong>. Dentist usernames are synced from Supabase on startup.
             </CardDescription>
           </CardHeader>
           <CardContent>

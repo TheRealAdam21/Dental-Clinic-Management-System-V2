@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { sensitiveStore, SENSITIVE_KEYS } from '@/lib/sensitiveStore';
-import { cacheDentistsFromServer, findDentistForLogin } from '@/lib/authService';
+import { pullDentistsFromSupabase, findDentistForLogin } from '@/lib/authService';
 
 interface LocalUser {
   id: string;
@@ -39,21 +39,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LOCAL_AUTH_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as LocalSession;
-        setSession(parsed);
-        setUser(parsed.user);
-        setUserRole(parsed.user.role);
+    const bootstrap = async () => {
+      try {
+        const raw = localStorage.getItem(LOCAL_AUTH_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as LocalSession;
+          setSession(parsed);
+          setUser(parsed.user);
+          setUserRole(parsed.user.role);
+        }
+      } catch (_error) {
+        localStorage.removeItem(LOCAL_AUTH_KEY);
       }
-    } catch (_error) {
-      localStorage.removeItem(LOCAL_AUTH_KEY);
-    } finally {
-      setLoading(false);
-    }
 
-    void cacheDentistsFromServer();
+      try {
+        await pullDentistsFromSupabase();
+      } catch (error) {
+        console.error('Failed to preload dentists:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void bootstrap();
   }, []);
 
   const signIn = async (email: string, password: string) => {

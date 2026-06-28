@@ -2,53 +2,42 @@ import { supabase } from '@/integrations/supabase/client';
 import { db } from '@/services/db';
 import type { Dentist } from '@/types';
 
+/** Pull all dentists from Supabase and refresh the local cache. */
+export const pullDentistsFromSupabase = async (): Promise<Dentist[]> => {
+  if (!navigator.onLine) {
+    return db.dentists.orderBy('last_name').toArray();
+  }
+
+  const { data, error } = await supabase
+    .from('dentists')
+    .select('*')
+    .order('last_name', { ascending: true });
+
+  if (error) {
+    console.error('Failed to pull dentists from Supabase:', error);
+    return db.dentists.orderBy('last_name').toArray();
+  }
+
+  const dentists = (data ?? []) as Dentist[];
+  if (dentists.length > 0) {
+    await db.dentists.bulkPut(dentists);
+  }
+
+  return dentists;
+};
+
 export const findDentistForLogin = async (username: string): Promise<Dentist | undefined> => {
   const normalizedUsername = username.trim().toLowerCase();
   if (!normalizedUsername) return undefined;
 
-  const localMatch = await db.dentists
+  if (navigator.onLine) {
+    const dentists = await pullDentistsFromSupabase();
+    return dentists.find(
+      (dentist) => dentist.username?.toLowerCase() === normalizedUsername
+    );
+  }
+
+  return db.dentists
     .filter((dentist) => dentist.username?.toLowerCase() === normalizedUsername)
     .first();
-
-  if (localMatch) return localMatch;
-
-  if (!navigator.onLine) return undefined;
-
-  try {
-    const { data, error } = await supabase.from('dentists').select('*');
-
-    if (error) {
-      console.error('Failed to fetch dentist for login:', error);
-      return undefined;
-    }
-
-    const remoteMatch = (data ?? []).find(
-      (dentist) => (dentist as Dentist).username?.toLowerCase() === normalizedUsername
-    ) as Dentist | undefined;
-
-    if (!remoteMatch) return undefined;
-
-    await db.dentists.put(remoteMatch);
-    return remoteMatch;
-  } catch (error) {
-    console.error('Dentist login lookup failed:', error);
-    return undefined;
-  }
-};
-
-export const cacheDentistsFromServer = async (): Promise<void> => {
-  if (!navigator.onLine) return;
-
-  try {
-    const { data, error } = await supabase
-      .from('dentists')
-      .select('*')
-      .order('last_name', { ascending: true });
-
-    if (error || !data?.length) return;
-
-    await db.dentists.bulkPut(data as Dentist[]);
-  } catch (error) {
-    console.error('Failed to cache dentists from server:', error);
-  }
 };
