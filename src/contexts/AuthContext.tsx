@@ -1,8 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { db } from '@/services/db';
 import { sensitiveStore, SENSITIVE_KEYS } from '@/lib/sensitiveStore';
-import type { Dentist } from '@/types';
+import { cacheDentistsFromServer, findDentistForLogin } from '@/lib/authService';
 
 interface LocalUser {
   id: string;
@@ -53,11 +52,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
+
+    void cacheDentistsFromServer();
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      setLoading(true);
       const normalizedEmail = email.trim().toLowerCase();
       const normalizedPassword = password.trim();
 
@@ -71,9 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user_metadata: { first_name: 'Admin' }
         };
       } else {
-        const dentist: Dentist | undefined = await db.dentists
-          .filter((d) => d.username?.toLowerCase() === normalizedEmail)
-          .first();
+        const dentist = await findDentistForLogin(normalizedEmail);
         if (!dentist || dentist.password !== normalizedPassword) {
           return { error: { message: 'Invalid username or password' } };
         }
@@ -95,8 +93,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     } catch (error) {
       return { error: { message: 'Invalid username or password' } };
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -118,9 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return normalizedPassword === ADMIN_PASSWORD;
     }
 
-    const dentist: Dentist | undefined = await db.dentists
-      .filter((d) => d.username?.toLowerCase() === user.email?.toLowerCase())
-      .first();
+    const dentist = await findDentistForLogin(user.email?.toLowerCase() ?? '');
     return !!dentist && dentist.password === normalizedPassword;
   };
 

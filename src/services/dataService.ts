@@ -103,6 +103,48 @@ export class DataService {
     return await db.dentists.orderBy('last_name').toArray();
   }
 
+  async addDentist(dentist: Omit<Dentist, 'id' | 'created_at'>): Promise<Dentist> {
+    const online = await this.isOnline();
+    const newDentist: Dentist = {
+      ...dentist,
+      id: generateId(),
+      created_at: new Date().toISOString(),
+    };
+
+    await db.dentists.add(newDentist);
+
+    if (online) {
+      try {
+        const { error } = await supabase.from('dentists').insert(newDentist);
+        if (error) throw error;
+      } catch (error) {
+        await syncService.addToSyncQueue('dentists', 'insert', newDentist);
+      }
+    } else {
+      await syncService.addToSyncQueue('dentists', 'insert', newDentist);
+    }
+
+    return newDentist;
+  }
+
+  async updateDentist(id: string, updates: Partial<Dentist>): Promise<void> {
+    const online = await this.isOnline();
+    const updatedData = { ...updates, updated_at: new Date().toISOString() };
+
+    await db.dentists.update(id, updatedData);
+
+    if (online) {
+      try {
+        const { error } = await supabase.from('dentists').update(updatedData).eq('id', id);
+        if (error) throw error;
+      } catch (error) {
+        await syncService.addToSyncQueue('dentists', 'update', { id, ...updatedData });
+      }
+    } else {
+      await syncService.addToSyncQueue('dentists', 'update', { id, ...updatedData });
+    }
+  }
+
   // Appointments
   async getAppointments(): Promise<Appointment[]> {
     const online = await this.isOnline();

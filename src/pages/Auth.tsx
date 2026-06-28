@@ -45,8 +45,8 @@ const Auth = () => {
         console.error('Login error:', error);
         toast.error(error.message || "Login failed");
       } else {
-        console.log('Login successful');
         toast.success("Login successful!");
+        navigate('/', { replace: true });
       }
     } catch (error) {
       console.error('Unexpected login error:', error);
@@ -83,7 +83,7 @@ const Auth = () => {
           <CardHeader>
             <CardTitle>Login</CardTitle>
             <CardDescription>
-              Sign in to access the clinic management system
+              Admin: username <strong>admin</strong>. Dentist accounts sync from the cloud on web.
             </CardDescription>
           </CardHeader>
           <CardContent>

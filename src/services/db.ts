@@ -48,7 +48,6 @@ export class ToothTimeDB extends Dexie {
 }
 
 export const db = new ToothTimeDB();
-const DENTISTS_CLEAR_FLAG = 'toothtime.dentists.cleared.v1';
 
 // Initialize app state
 db.appState.get(1).then(state => {
@@ -58,12 +57,5 @@ db.appState.get(1).then(state => {
       isOnline: navigator.onLine,
       syncInProgress: false 
     });
-  }
-});
-
-db.on('ready', async () => {
-  if (!localStorage.getItem(DENTISTS_CLEAR_FLAG)) {
-    await db.dentists.clear();
-    localStorage.setItem(DENTISTS_CLEAR_FLAG, 'true');
   }
 });
