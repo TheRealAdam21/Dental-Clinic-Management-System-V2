@@ -1,0 +1,13 @@
+node_modules
+.git
+.vercel
+dist
+release
+src-tauri
+android
+db_cluster*
+*.backup
+supabase/.temp
+.env
+.env.*
+!.env.example
