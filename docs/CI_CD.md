@@ -72,9 +72,25 @@ git push to main
 ### Vercel (deployment)
 
 - **Trigger:** every push to `main`
-- **Where to check:** [vercel.com/dashboard](https://vercel.com/dashboard) → your project → Deployments
+- **Correct project:** `tooth-time-dental` (not `project-y3qvy`)
+- **Where to check:** [vercel.com/dashboard](https://vercel.com/dashboard) → **tooth-time-dental** → Deployments
 - **Live URL:** https://tooth-time-dental.vercel.app
-- **Env vars:** set in Vercel → Project → Settings → Environment Variables
+- **Env vars:** Vercel → tooth-time-dental → Settings → Environment Variables
+
+#### Troubleshooting Vercel deploys
+
+| Problem | Fix |
+|---------|-----|
+| "Provisioning integrations failed" on `project-y3qvy` | Wrong project — use **tooth-time-dental** instead |
+| "GitHub isn't a member of the team" | Vercel → Settings → Git → reconnect GitHub as **TheRealAdam21** |
+| Repo connected to wrong project | Vercel → project → Settings → Git → Disconnect, then connect to **tooth-time-dental** |
+
+Or via CLI from the repo folder:
+
+```bash
+vercel link --project tooth-time-dental --yes
+vercel git connect https://github.com/TheRealAdam21/Dental-Clinic-Management-System-V2.git
+```
 
 ### GitHub Actions CI (quality + desktop builds)
 
