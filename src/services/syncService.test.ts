@@ -7,6 +7,9 @@ const { serverState } = vi.hoisted(() => ({
   serverState: {
     rows: {} as Record<string, Row[]>,
     failWrites: false,
+    // When set, writes are validated like PostgREST does and rejected with
+    // PGRST204 if the payload contains a column the table does not have.
+    columns: null as Record<string, string[]> | null,
   },
 }));
 
@@ -37,6 +40,25 @@ const makeBuilder = (table: string) => {
 
     if (serverState.failWrites) {
       return { data: null, error: { message: 'simulated network failure', code: 'NETWORK' } };
+    }
+
+    if (serverState.columns && state.op !== 'delete' && state.op !== 'select') {
+      const allowed = serverState.columns[table];
+      if (allowed) {
+        const rows = Array.isArray(state.payload) ? state.payload : [state.payload as Row];
+        for (const row of rows) {
+          const unknown = Object.keys(row ?? {}).find((key) => !allowed.includes(key));
+          if (unknown) {
+            return {
+              data: null,
+              error: {
+                code: 'PGRST204',
+                message: `Could not find the '${unknown}' column of '${table}' in the schema cache`,
+              },
+            };
+          }
+        }
+      }
     }
 
     if (state.op === 'insert' || state.op === 'upsert') {
@@ -138,6 +160,7 @@ describe('syncService offline queue', () => {
   beforeEach(async () => {
     serverState.rows = {};
     serverState.failWrites = false;
+    serverState.columns = null;
     setOnline(false);
     await Promise.all([
       db.patients.clear(),
@@ -217,6 +240,62 @@ describe('syncService offline queue', () => {
     expect(serverState.rows.visits[0]).not.toHaveProperty('treatment_provided');
     expect(serverState.rows.visits[0]).not.toHaveProperty('amount_charged');
     expect(serverState.rows.visits[0]).not.toHaveProperty('appointment_id');
+  });
+
+  it('sends a new dentist without columns the live table does not have', async () => {
+    serverState.columns = {
+      dentists: [
+        'id', 'username', 'first_name', 'last_name', 'specialization', 'password', 'email',
+        'phone', 'created_at',
+      ],
+    };
+
+    await syncService.addToSyncQueue('dentists', 'insert', {
+      id: 'dentist-9',
+      username: 'newdoc',
+      password: 'secret123',
+      first_name: 'New',
+      last_name: 'Doc',
+      specialization: 'Orthodontics',
+      email: 'newdoc@clinic.local',
+      created_at: '2026-10-30T00:00:00.000Z',
+      updated_at: '2026-10-30T00:00:00.000Z',
+      user_id: null,
+      license_number: null,
+    });
+    setOnline(true);
+
+    const result = await syncService.flush();
+
+    expect(result.pending).toBe(0);
+    expect(serverState.rows.dentists).toEqual([
+      expect.objectContaining({ id: 'dentist-9', username: 'newdoc', password: 'secret123' }),
+    ]);
+    expect(serverState.rows.dentists[0]).not.toHaveProperty('updated_at');
+    expect(serverState.rows.dentists[0]).not.toHaveProperty('user_id');
+  });
+
+  it('retries without a column the server reports as unknown', async () => {
+    // Simulates schema drift: the local column list is ahead of the live table.
+    serverState.columns = {
+      patients: ['id', 'first_name', 'last_name', 'phone', 'created_at', 'updated_at'],
+    };
+
+    await syncService.addToSyncQueue('patients', 'insert', {
+      id: 'patient-7',
+      first_name: 'Ada',
+      last_name: 'Reyes',
+      phone: '0917',
+      xray_images: ['https://example.test/xray.png'],
+    });
+    setOnline(true);
+
+    const result = await syncService.flush();
+
+    expect(result.pending).toBe(0);
+    expect(serverState.rows.patients).toHaveLength(1);
+    expect(serverState.rows.patients[0]).toMatchObject({ id: 'patient-7', first_name: 'Ada' });
+    expect(serverState.rows.patients[0]).not.toHaveProperty('xray_images');
   });
 
   it('keeps un-uploaded local records when pulling server data', async () => {

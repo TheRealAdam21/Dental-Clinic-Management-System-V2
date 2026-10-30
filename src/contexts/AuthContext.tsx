@@ -56,7 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
 
       preloadDentistAccounts();
-      void syncService.syncAll().catch((error) => {
+      // Force a retry on launch so changes that exhausted their retry budget
+      // (for example records queued against an older schema) get another chance.
+      void syncService.syncAll({ force: true }).catch((error) => {
         console.error('Failed to preload clinic data:', error);
       });
     };
@@ -80,8 +82,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       } else {
         const dentist = await findDentistForLogin(normalizedEmail);
-        if (!dentist || dentist.password !== normalizedPassword) {
-          return { error: { message: 'Invalid username or password' } };
+        if (!dentist) {
+          return {
+            error: {
+              message:
+                'No clinic account matches that username. Sign in as admin to add the dentist, then try again.'
+            }
+          };
+        }
+        if (dentist.password !== normalizedPassword) {
+          return { error: { message: 'Incorrect password for that username' } };
         }
         userData = {
           id: dentist.id,

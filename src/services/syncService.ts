@@ -51,15 +51,18 @@ const TABLE_CONFIG: Record<SyncTableName, { serverTable: ServerTableName; column
     columns: [
       'id', 'first_name', 'last_name', 'email', 'phone', 'date_of_birth', 'age', 'occupation',
       'marital_status', 'address', 'emergency_contact_name', 'emergency_contact_phone',
-      'insurance_provider', 'insurance_policy_number', 'gender', 'medical_history',
+      'insurance_provider', 'insurance_policy_number', 'gender',
       'xray_images', 'created_at', 'updated_at'
     ]
   },
+  // The live dentists table only has the login columns; sending updated_at or
+  // user_id makes PostgREST reject the whole row with PGRST204, which is how
+  // newly added dentists used to stay stuck on the device that created them.
   dentists: {
     serverTable: 'dentists',
     columns: [
-      'id', 'user_id', 'email', 'first_name', 'last_name', 'license_number', 'phone',
-      'specialization', 'username', 'password', 'created_at', 'updated_at'
+      'id', 'email', 'first_name', 'last_name', 'phone',
+      'specialization', 'username', 'password', 'created_at'
     ]
   },
   appointments: {
@@ -70,7 +73,9 @@ const TABLE_CONFIG: Record<SyncTableName, { serverTable: ServerTableName; column
     ]
   },
   medicalHistory: {
-    serverTable: 'medical_history',
+    // The project exposes this table as camelCase; the snake_case name in the
+    // migration was never applied, so writes to it returned PGRST205.
+    serverTable: 'medicalHistory',
     columns: [
       'id', 'patient_id', 'physician_name', 'physician_specialty', 'physician_address',
       'physician_phone', 'in_good_health', 'in_medical_treatment', 'treatment_condition',
@@ -85,14 +90,14 @@ const TABLE_CONFIG: Record<SyncTableName, { serverTable: ServerTableName; column
     serverTable: 'visits',
     columns: [
       'id', 'patient_id', 'visit_date', 'diagnosis', 'treatment', 'treatment_cost', 'notes',
-      'xray_images', 'created_at', 'updated_at'
+      'xray_images', 'created_at'
     ]
   },
   payments: {
     serverTable: 'payments',
     columns: [
-      'id', 'patient_id', 'amount', 'payment_method', 'payment_date', 'description', 'status',
-      'created_at', 'updated_at'
+      'id', 'patient_id', 'amount', 'payment_method', 'payment_date', 'status',
+      'created_at'
     ]
   }
 };
@@ -112,6 +117,16 @@ const isDuplicateKeyError = (error: unknown): boolean => {
   if (!error) return false;
   const candidate = error as { code?: string; message?: string };
   return candidate.code === '23505' || /duplicate key/i.test(candidate.message ?? '');
+};
+
+/** PostgREST code for "column not found" — it rejects the whole row. */
+const UNKNOWN_COLUMN_CODE = 'PGRST204';
+
+/** Extracts the column name PostgREST complains about, if that is the error. */
+const unknownColumnFrom = (error: unknown): string | undefined => {
+  const candidate = error as { code?: string; message?: string } | null;
+  if (candidate?.code !== UNKNOWN_COLUMN_CODE) return undefined;
+  return candidate.message?.match(/'([^']+)' column/)?.[1];
 };
 
 /**
@@ -319,31 +334,38 @@ export class SyncService {
       case 'insert': {
         // upsert keeps this safe if a previous push reached the server but the
         // local queue write did not finish.
-        const { error } = await supabase
-          .from(serverTable)
-          .upsert(payload as never, { onConflict: 'id' });
+        const { error } = await this.writeWithColumnHealing(item.table, serverTable, payload, (data) =>
+          supabase.from(serverTable).upsert(data as never, { onConflict: 'id' })
+        );
         if (error && !isDuplicateKeyError(error)) throw error;
         return;
       }
 
       case 'update': {
-        const { data, error } = await supabase
-          .from(serverTable)
-          .update(payload as never)
-          .eq('id', payload.id as string)
-          .select('id');
+        const result = await this.writeWithColumnHealing(item.table, serverTable, payload, (data) =>
+          supabase
+            .from(serverTable)
+            .update(data as never)
+            .eq('id', data.id as string)
+            .select('id')
+        );
 
-        if (error) throw error;
+        if (result.error) throw result.error;
+
+        const updated = result.data as Array<{ id: string }> | null;
 
         // The row is missing remotely (for example a create that never landed),
         // so send the full record we hold locally instead of silently dropping it.
-        if (!data || data.length === 0) {
+        if (!updated || updated.length === 0) {
           const localRecord = await this.readLocalRecord(item.table, payload.id as string);
           if (!localRecord) throw new Error('Record not found locally for update fallback');
 
-          const { error: upsertError } = await supabase
-            .from(serverTable)
-            .upsert(this.sanitize(item.table, localRecord) as never, { onConflict: 'id' });
+          const { error: upsertError } = await this.writeWithColumnHealing(
+            item.table,
+            serverTable,
+            this.sanitize(item.table, localRecord),
+            (data) => supabase.from(serverTable).upsert(data as never, { onConflict: 'id' })
+          );
           if (upsertError) throw upsertError;
         }
         return;
@@ -361,6 +383,35 @@ export class SyncService {
       default:
         throw new Error(`Unsupported sync operation: ${String(item.operation)}`);
     }
+  }
+
+  /**
+   * A single unknown column makes PostgREST reject the entire row, so a schema
+   * drift used to strand records in the queue forever. Drop the column the
+   * server names and retry instead of losing the write.
+   */
+  private async writeWithColumnHealing(
+    table: SyncTableName,
+    serverTable: ServerTableName,
+    payload: Record<string, unknown>,
+    write: (data: Record<string, unknown>) => PromiseLike<{ data?: unknown; error: unknown }>
+  ): Promise<{ data?: unknown; error: unknown }> {
+    const data = { ...payload };
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const result = await write(data);
+      if (!result.error) return result;
+
+      const column = unknownColumnFrom(result.error);
+      if (!column || !(column in data)) return result;
+
+      console.warn(
+        `Supabase has no ${table}.${column} column; retrying without it.`
+      );
+      delete data[column];
+    }
+
+    return { error: new Error(`Could not sync ${table}: too many unknown columns`) };
   }
 
   private async readLocalRecord(table: SyncTableName, id: string): Promise<Record<string, unknown> | undefined> {

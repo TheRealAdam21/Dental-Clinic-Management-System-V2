@@ -25,7 +25,8 @@ const AdminDentistManager = () => {
   });
 
   const fetchDentists = async () => {
-    await syncService.syncAll();
+    // force: retry accounts whose earlier uploads failed on a schema mismatch.
+    await syncService.syncAll({ force: true });
     const data = await dataService.getDentists();
     setDentists(data);
   };
@@ -133,8 +134,8 @@ const AdminDentistManager = () => {
       toast.success("Dentist updated successfully.");
       setEditOpen(false);
       await fetchDentists();
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to update dentist.");
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : "Failed to update dentist.");
     } finally {
       setLoading(false);
     }
