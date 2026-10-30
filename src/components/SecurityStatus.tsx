@@ -52,7 +52,7 @@ const SecurityStatus = () => {
                 <div className="text-green-600">{feature.icon}</div>
                 <div>
                   <h4 className="font-semibold">{feature.name}</h4>
-                  <p className="text-sm text-gray-600">{feature.description}</p>
+                  <p className="text-sm text-muted-foreground">{feature.description}</p>
                 </div>
               </div>
               <Badge variant="secondary" className="bg-green-100 text-green-800">

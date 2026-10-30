@@ -17,13 +17,13 @@ const PatientDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">Patient Portal</h1>
-            <p className="text-gray-600">Welcome back, {user?.user_metadata?.first_name}!</p>
+            <h1 className="text-3xl font-bold text-foreground">Patient Portal</h1>
+            <p className="text-muted-foreground">Welcome back, {user?.user_metadata?.first_name}!</p>
           </div>
           <Button onClick={handleSignOut} variant="outline">
             <LogOut className="h-4 w-4 mr-2" />
@@ -49,7 +49,7 @@ const PatientDashboard = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <UserPlus className="h-5 w-5 text-blue-600" />
+                  <UserPlus className="h-5 w-5 text-primary" />
                   Update Profile Information
                 </CardTitle>
                 <CardDescription>
@@ -67,7 +67,7 @@ const PatientDashboard = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-blue-600" />
+                  <Calendar className="h-5 w-5 text-primary" />
                   Schedule New Appointment
                 </CardTitle>
                 <CardDescription>

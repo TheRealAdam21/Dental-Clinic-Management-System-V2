@@ -42,6 +42,21 @@ export default defineConfig(() => {
           importScripts: ['push-handler.js'],
           runtimeCaching: [
             {
+              // OCR worker/wasm/language files are large, so they are not
+              // precached; cache them the first time they are downloaded so
+              // scanning keeps working offline afterwards.
+              urlPattern: /\/tesseract\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'tesseract-assets',
+                expiration: {
+                  maxEntries: 30,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
               urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/.*/i,
               handler: 'NetworkOnly',
             },

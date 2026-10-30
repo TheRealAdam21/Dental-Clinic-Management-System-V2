@@ -94,14 +94,14 @@ const AppointmentRescheduleModal = ({
         
         <div className="space-y-4">
           {appointment && (
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-sm text-gray-600 mb-2">
+            <div className="bg-muted/50 p-3 rounded-lg">
+              <p className="text-sm text-muted-foreground mb-2">
                 <strong>Patient:</strong> {appointment.patient?.first_name} {appointment.patient?.last_name}
               </p>
-              <p className="text-sm text-gray-600 mb-2">
+              <p className="text-sm text-muted-foreground mb-2">
                 <strong>Current Date:</strong> {currentDateTime.date}
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 <strong>Current Time:</strong> {currentDateTime.time}
               </p>
             </div>
@@ -135,7 +135,7 @@ const AppointmentRescheduleModal = ({
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+              <Button type="submit" className="bg-primary hover:bg-primary/90">
                 Reschedule Appointment
               </Button>
             </DialogFooter>

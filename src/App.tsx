@@ -1,4 +1,5 @@
 
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,10 +10,17 @@ import { ThemeProvider } from "@/components/theme-provider";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import { startAutoSync } from "@/services/syncService";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  // Flush offline changes on reconnect / tab focus, and refresh remote data periodically.
+  useEffect(() => {
+    startAutoSync();
+  }, []);
+
+  return (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="toothtime-theme">
       <TooltipProvider>
@@ -31,6 +39,7 @@ const App = () => (
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;

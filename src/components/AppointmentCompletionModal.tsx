@@ -142,7 +142,7 @@ const AppointmentCompletionModal = ({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+            <Button type="submit" className="bg-primary hover:bg-primary/90">
               Complete Appointment
             </Button>
           </DialogFooter>

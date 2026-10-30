@@ -45,12 +45,12 @@ const PatientXrayManager = ({ patient }: PatientXrayManagerProps) => {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ImageIcon className="h-5 w-5 text-blue-600" />
+            <ImageIcon className="h-5 w-5 text-primary" />
             X-ray Images for {patient.first_name} {patient.last_name}
           </div>
           <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
             <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700">
+              <Button className="bg-primary hover:bg-primary/90">
                 <Plus className="h-4 w-4 mr-1" />
                 Manage X-rays
               </Button>
@@ -70,10 +70,10 @@ const PatientXrayManager = ({ patient }: PatientXrayManagerProps) => {
       </CardHeader>
       <CardContent>
         {patientXrays.length === 0 ? (
-          <p className="text-center text-gray-500 py-4">No X-ray images uploaded yet</p>
+          <p className="text-center text-muted-foreground py-4">No X-ray images uploaded yet</p>
         ) : (
           <div className="flex items-center gap-2">
-            <Badge className="bg-blue-100 text-blue-800">
+            <Badge className="bg-accent text-accent-foreground">
               <ImageIcon className="h-3 w-3 mr-1" />
               {patientXrays.length} X-ray image{patientXrays.length > 1 ? 's' : ''} on file
             </Badge>

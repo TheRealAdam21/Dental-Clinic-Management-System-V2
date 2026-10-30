@@ -84,8 +84,11 @@ describe('authService', () => {
     });
 
     preloadDentistAccounts();
-    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    await expect(db.dentists.count()).resolves.toBe(1);
+    // The preload runs in the background; wait for the cache write instead of
+    // assuming it finishes within one macrotask.
+    await vi.waitFor(async () => {
+      await expect(db.dentists.count()).resolves.toBe(1);
+    });
   });
 });

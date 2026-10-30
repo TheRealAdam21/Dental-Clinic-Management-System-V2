@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Users, FileText, LogOut, Stethoscope, UserPlus } from "lucide-react";
+import { Calendar, Users, FileText, LogOut, UserPlus } from "lucide-react";
+import { format } from "date-fns";
 import PatientList from "@/components/PatientList";
 import AppointmentScheduler from "@/components/AppointmentScheduler";
 import PatientForm from "@/components/PatientForm";
@@ -11,17 +11,18 @@ import AdminDentistManager from "@/components/AdminDentistManager";
 import { NetworkStatus } from "@/components/NetworkStatus";
 import { useAuth } from "@/contexts/AuthContext";
 import ThemeToggle from "@/components/ThemeToggle";
+import ToothMark from "@/components/ToothMark";
 import { useAppointmentNotifications } from "@/hooks/useAppointmentNotifications";
 import { useNativeAppointmentNotifications } from "@/hooks/useNativeAppointmentNotifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
-type DashboardMode = 'admin' | 'dentist';
+type DashboardMode = "admin" | "dentist";
 
 const DentistDashboardFull = ({ mode }: { mode: DashboardMode }) => {
   const [activeTab, setActiveTab] = useState("appointments");
-  const [isRecordsAuthenticated, setIsRecordsAuthenticated] = useState(mode === 'admin');
+  const [isRecordsAuthenticated, setIsRecordsAuthenticated] = useState(mode === "admin");
   const { signOut, user } = useAuth();
-  const isAdmin = mode === 'admin';
+  const isAdmin = mode === "admin";
   useAppointmentNotifications(user);
   useNativeAppointmentNotifications(user);
   usePushNotifications(user);
@@ -38,97 +39,124 @@ const DentistDashboardFull = ({ mode }: { mode: DashboardMode }) => {
     }
   };
 
+  const tabTriggerClass =
+    "flex-none gap-2 rounded-none border-b-2 border-transparent bg-transparent px-0.5 pb-2.5 pt-1 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none";
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-8">
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border bg-card/60 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
-            <Stethoscope className="h-8 w-8 text-blue-600" />
+            <span className="grid h-10 w-10 place-items-center rounded-md bg-primary text-primary-foreground">
+              <ToothMark className="h-6 w-6" />
+            </span>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100">Dental Clinic Management</h1>
-              <p className="text-gray-600 dark:text-gray-300">
-                {isAdmin
-                  ? "Welcome, Admin!"
-                  : `Welcome, Dr. ${user?.user_metadata?.first_name || user?.email}!`}
+              <p className="font-display text-lg leading-none">Tooth Time</p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                Dental Clinic
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="hidden text-xs text-muted-foreground md:inline">
+              {format(new Date(), "EEE, MMM d")}
+            </span>
             <NetworkStatus />
             <ThemeToggle />
-            <Button onClick={handleSignOut} variant="outline">
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+            <span className="hidden h-7 w-px bg-border sm:block" />
+            <div className="hidden text-right sm:block">
+              <p className="text-xs font-medium leading-tight">
+                {isAdmin ? "Admin" : `Dr. ${user?.user_metadata?.first_name ?? user?.email ?? ""}`}
+              </p>
+              <p className="text-[11px] leading-tight text-muted-foreground">{user?.email}</p>
+            </div>
+            <Button
+              onClick={handleSignOut}
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
+      </header>
 
-        {/* Navigation Tabs */}
+      <main className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="w-full mb-8 flex overflow-x-auto whitespace-nowrap gap-2 p-1">
-            <TabsTrigger value="appointments" className="flex-none flex items-center gap-2">
+          <TabsList className="mb-8 flex w-full justify-start gap-6 overflow-x-auto rounded-none border-b border-border bg-transparent p-0">
+            <TabsTrigger value="appointments" className={tabTriggerClass}>
               <Calendar className="h-4 w-4" />
               Appointments
             </TabsTrigger>
-            <TabsTrigger value="patients" className="flex-none flex items-center gap-2">
+            <TabsTrigger value="patients" className={tabTriggerClass}>
               <UserPlus className="h-4 w-4" />
-              Add Patient
+              New Patient
             </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="dentists" className="flex-none flex items-center gap-2">
+              <TabsTrigger value="dentists" className={tabTriggerClass}>
                 <Users className="h-4 w-4" />
                 Dentists
               </TabsTrigger>
             )}
-            <TabsTrigger value="records" className="flex-none flex items-center gap-2">
+            <TabsTrigger value="records" className={tabTriggerClass}>
               <FileText className="h-4 w-4" />
               Patient Records
             </TabsTrigger>
           </TabsList>
 
-          {/* Appointment Management */}
           <TabsContent value="appointments" className="space-y-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">Appointments</h2>
-              <p className="text-gray-600 dark:text-gray-300">Use calendar date popups to manage and schedule appointments.</p>
+            <div className="max-w-2xl">
+              <h1 className="font-display text-2xl sm:text-3xl">Appointments</h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                Review the month, open a day to approve or complete visits, and book patients directly
+                from the calendar.
+              </p>
             </div>
             <AppointmentScheduler />
           </TabsContent>
 
-          {/* Patient Registration */}
           <TabsContent value="patients" className="space-y-6">
+            <div className="max-w-2xl">
+              <h1 className="font-display text-2xl sm:text-3xl">New Patient</h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                Enter the details manually, or scan a printed record to fill the form.
+              </p>
+            </div>
             <PatientForm />
           </TabsContent>
 
           {isAdmin && (
             <TabsContent value="dentists" className="space-y-6">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">Manage Dentists</h2>
-                <p className="text-gray-600 dark:text-gray-300">Admin can add/edit dentists for appointment scheduling.</p>
+              <div className="max-w-2xl">
+                <h1 className="font-display text-2xl sm:text-3xl">Dentists</h1>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  Manage the dentists patients can be scheduled with.
+                </p>
               </div>
               <AdminDentistManager />
             </TabsContent>
           )}
 
-          {/* Patient Records with Password Protection */}
           <TabsContent value="records" className="space-y-6">
             {!isRecordsAuthenticated ? (
-              <PatientRecordsAuth 
-                onAuthenticated={() => setIsRecordsAuthenticated(true)}
-              />
+              <PatientRecordsAuth onAuthenticated={() => setIsRecordsAuthenticated(true)} />
             ) : (
               <>
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">Patient Records</h2>
-                  <p className="text-gray-600 dark:text-gray-300">View and manage patient visits and payments</p>
+                <div className="max-w-2xl">
+                  <h1 className="font-display text-2xl sm:text-3xl">Patient Records</h1>
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    Visit history, X-rays, certificates and payments.
+                  </p>
                 </div>
                 <PatientList showVisits={true} />
               </>
             )}
           </TabsContent>
         </Tabs>
-      </div>
+      </main>
     </div>
   );
 };

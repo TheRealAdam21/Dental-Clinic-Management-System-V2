@@ -25,7 +25,7 @@ export const pullDentistsFromSupabase = async (): Promise<Dentist[]> => {
     return db.dentists.orderBy('last_name').toArray();
   }
 
-  const dentists = (data ?? []) as Dentist[];
+  const dentists = (data ?? []) as unknown as Dentist[];
   await cacheDentists(dentists);
   return dentists;
 };
@@ -43,7 +43,7 @@ export const findDentistForLogin = async (username: string): Promise<Dentist | u
       .maybeSingle();
 
     if (!error && data) {
-      const dentist = data as Dentist;
+      const dentist = data as unknown as Dentist;
       await db.dentists.put(dentist);
       return dentist;
     }

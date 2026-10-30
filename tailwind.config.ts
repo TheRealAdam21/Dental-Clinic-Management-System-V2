@@ -18,6 +18,26 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				sans: [
+					'ui-sans-serif',
+					'system-ui',
+					'-apple-system',
+					'Segoe UI',
+					'Roboto',
+					'Helvetica Neue',
+					'Arial',
+					'sans-serif'
+				],
+				display: [
+					'ui-serif',
+					'Iowan Old Style',
+					'Palatino Linotype',
+					'Palatino',
+					'Georgia',
+					'serif'
+				]
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',

@@ -62,9 +62,7 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
         visit_date: formData.visit_date,
         diagnosis: formData.diagnosis,
         treatment: formData.treatment,
-        treatment_provided: formData.treatment,
         treatment_cost: formData.treatment_cost ? parseFloat(formData.treatment_cost) : null,
-        amount_charged: formData.treatment_cost ? parseFloat(formData.treatment_cost) : undefined,
         notes: formData.notes || undefined,
         xray_images: xrayImages.length > 0 ? xrayImages : null
       });
@@ -99,7 +97,7 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-600" />
+              <FileText className="h-5 w-5 text-primary" />
               Visit Records for {patient.first_name} {patient.last_name}
             </div>
             <div className="flex items-center gap-2">
@@ -128,7 +126,7 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
 
               <Button
                 onClick={() => setShowAddForm(!showAddForm)}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-primary hover:bg-primary/90"
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Visit
@@ -138,7 +136,7 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
         </CardHeader>
         <CardContent>
           {showAddForm && (
-            <Card className="mb-6 border-blue-200">
+            <Card className="mb-6 border-primary/25">
               <CardHeader>
                 <CardTitle className="text-lg">Add New Visit Record</CardTitle>
               </CardHeader>
@@ -208,7 +206,7 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
                   />
 
                   <div className="flex gap-2">
-                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                    <Button type="submit" className="bg-primary hover:bg-primary/90">
                       Save Visit Record
                     </Button>
                     <Button 
@@ -226,14 +224,14 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
 
           <div className="space-y-4">
             {visits.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">No visit records found</p>
+              <p className="text-center text-muted-foreground py-8">No visit records found</p>
             ) : (
               visits.map((visit) => (
                 <Card key={visit.id} className="border-l-4 border-l-green-500">
                   <CardContent className="pt-4">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-gray-500" />
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
                         <span className="font-semibold">
                           {new Date(visit.visit_date).toLocaleDateString()}
                         </span>
@@ -246,7 +244,7 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
                           </Badge>
                         )}
                         {visit.xray_images && visit.xray_images.length > 0 && (
-                          <Badge className="bg-blue-100 text-blue-800">
+                          <Badge className="bg-accent text-accent-foreground">
                             <ImageIcon className="h-3 w-3 mr-1" />
                             {visit.xray_images.length} X-ray{visit.xray_images.length > 1 ? 's' : ''}
                           </Badge>
@@ -256,25 +254,25 @@ const VisitTracker = ({ patient }: VisitTrackerProps) => {
 
                     <div className="space-y-3">
                       <div>
-                        <h4 className="font-semibold text-sm text-gray-700">Diagnosis:</h4>
+                        <h4 className="font-semibold text-sm text-foreground/90">Diagnosis:</h4>
                         <p className="text-sm">{visit.diagnosis}</p>
                       </div>
 
                       <div>
-                        <h4 className="font-semibold text-sm text-gray-700">Treatment:</h4>
-                        <p className="text-sm">{visit.treatment ?? visit.treatment_provided}</p>
+                        <h4 className="font-semibold text-sm text-foreground/90">Treatment:</h4>
+                        <p className="text-sm">{visit.treatment}</p>
                       </div>
 
                       {visit.notes && (
                         <div>
-                          <h4 className="font-semibold text-sm text-gray-700">Notes:</h4>
-                          <p className="text-sm text-gray-600">{visit.notes}</p>
+                          <h4 className="font-semibold text-sm text-foreground/90">Notes:</h4>
+                          <p className="text-sm text-muted-foreground">{visit.notes}</p>
                         </div>
                       )}
 
                       {visit.xray_images && visit.xray_images.length > 0 && (
                         <div>
-                          <h4 className="font-semibold text-sm text-gray-700 mb-2">X-ray Images:</h4>
+                          <h4 className="font-semibold text-sm text-foreground/90 mb-2">X-ray Images:</h4>
                           <XrayImageUpload
                             visitId={visit.id}
                             patientId={patient.id}

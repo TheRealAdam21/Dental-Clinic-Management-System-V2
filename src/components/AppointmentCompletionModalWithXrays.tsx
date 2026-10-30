@@ -50,14 +50,11 @@ const AppointmentCompletionModalWithXrays = ({
     try {
       // Create visit record
       await dataService.addVisit({
-        ...formData,
         patient_id: appointment.patient_id,
-        appointment_id: appointment.id,
+        visit_date: formData.visit_date,
         diagnosis: formData.diagnosis,
         treatment: formData.treatment,
-        treatment_provided: formData.treatment,
         treatment_cost: formData.treatment_cost ? parseFloat(formData.treatment_cost) : null,
-        amount_charged: formData.treatment_cost ? parseFloat(formData.treatment_cost) : undefined,
         notes: formData.notes,
         xray_images: xrayImages.length > 0 ? xrayImages : null
       });
@@ -106,7 +103,7 @@ const AppointmentCompletionModalWithXrays = ({
             <div>
               <Label htmlFor="visit_date">Visit Date *</Label>
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
+                <Calendar className="h-4 w-4 text-muted-foreground" />
                 <Input
                   id="visit_date"
                   type="date"
@@ -170,7 +167,7 @@ const AppointmentCompletionModalWithXrays = ({
 
           <div>
             <Label className="text-base font-semibold">X-ray Images (Optional)</Label>
-            <p className="text-sm text-gray-600 mb-2">Upload any X-ray images taken during this appointment</p>
+            <p className="text-sm text-muted-foreground mb-2">Upload any X-ray images taken during this appointment</p>
             <XrayImageUpload
               patientId={appointment?.patient_id}
               existingImages={xrayImages}
@@ -181,7 +178,7 @@ const AppointmentCompletionModalWithXrays = ({
           <div className="flex gap-2 pt-4 border-t">
             <Button 
               type="submit" 
-              className="bg-blue-600 hover:bg-blue-700" 
+              className="bg-primary hover:bg-primary/90" 
               disabled={loading}
             >
               {loading ? "Completing..." : "Complete Appointment"}

@@ -144,7 +144,7 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5 text-blue-600" />
+            <User className="h-5 w-5 text-primary" />
             {showVisits ? "Patient Records" : "Registered Patients"}
           </CardTitle>
         </CardHeader>
@@ -160,12 +160,12 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
 
           <div className="grid gap-4">
             {filteredPatients.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">
+              <p className="text-center text-muted-foreground py-8">
                 {searchTerm ? "No patients found matching your search" : "No patients registered yet"}
               </p>
             ) : (
               filteredPatients.map((patient) => (
-                <Card key={patient.id} className="border-l-4 border-l-blue-500">
+                <Card key={patient.id} className="border-l-4 border-l-primary">
                   <CardContent className="pt-4">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="flex-1">
@@ -176,14 +176,14 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
                             <Badge variant="outline">{patient.gender}</Badge>
                           )}
                           {patient.xray_images && patient.xray_images.length > 0 && (
-                            <Badge className="bg-blue-100 text-blue-800">
+                            <Badge className="bg-accent text-accent-foreground">
                               <ImageIcon className="h-3 w-3 mr-1" />
                               {patient.xray_images.length} X-ray{patient.xray_images.length > 1 ? 's' : ''}
                             </Badge>
                           )}
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-gray-600">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-muted-foreground">
                           {patient.phone && (
                             <div className="flex items-center gap-1">
                               <Phone className="h-4 w-4" />
@@ -213,7 +213,7 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
                         )}
 
                         {patient.medical_history && (
-                          <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                          <div className="mt-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
                             <strong>Medical History:</strong> {patient.medical_history}
                           </div>
                         )}
@@ -250,7 +250,7 @@ const PatientList = ({ showVisits = false }: PatientListProps) => {
                               setSelectedPatient(patient);
                               setViewMode('visits');
                             }}
-                            className="bg-blue-600 hover:bg-blue-700"
+                            className="bg-primary hover:bg-primary/90"
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View Records

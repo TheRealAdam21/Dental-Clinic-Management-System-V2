@@ -41,8 +41,8 @@ const PatientRecordsAuth = ({ onAuthenticated }: PatientRecordsAuthProps) => {
     <div className="flex items-center justify-center min-h-[400px]">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-            <Shield className="w-6 h-6 text-blue-600" />
+          <div className="mx-auto mb-4 w-12 h-12 bg-accent rounded-full flex items-center justify-center">
+            <Shield className="w-6 h-6 text-primary" />
           </div>
           <CardTitle>Patient Records Access</CardTitle>
           <CardDescription>

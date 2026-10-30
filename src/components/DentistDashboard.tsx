@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Calendar, Clock, User, FileText, CheckCircle, Trash2, RefreshCw } from "lucide-react";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { dataService } from "@/services/dataService";
+import { DATA_SYNCED_EVENT } from "@/services/syncService";
 import type { Appointment } from "@/types";
 import AppointmentCompletionModalWithXrays from "./AppointmentCompletionModalWithXrays";
 import AppointmentRescheduleModal from "./AppointmentRescheduleModal";
@@ -25,6 +26,13 @@ const DentistDashboard = () => {
     if (isAuthorized) {
       fetchAppointments();
     }
+
+    // Pick up appointments booked on another device after a background sync.
+    const handleSynced = () => {
+      void fetchAppointments();
+    };
+    window.addEventListener(DATA_SYNCED_EVENT, handleSynced);
+    return () => window.removeEventListener(DATA_SYNCED_EVENT, handleSynced);
   }, [isAuthorized]);
 
   const fetchAppointments = async () => {
@@ -80,19 +88,15 @@ const DentistDashboard = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { color: "bg-yellow-500", text: "Pending" },
-      approved: { color: "bg-green-500", text: "Approved" },
-      completed: { color: "bg-blue-500", text: "Completed" },
-      cancelled: { color: "bg-red-500", text: "Cancelled" }
+      pending: { color: "bg-amber-500 text-white", text: "Pending" },
+      approved: { color: "bg-emerald-600 text-white", text: "Approved" },
+      completed: { color: "bg-primary text-primary-foreground", text: "Completed" },
+      cancelled: { color: "bg-destructive text-destructive-foreground", text: "Cancelled" }
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-    
-    return (
-      <Badge className={`${config.color} text-white`}>
-        {config.text}
-      </Badge>
-    );
+
+    return <Badge className={config.color}>{config.text}</Badge>;
   };
 
   const formatDateTime = (dateTimeString: string) => {
@@ -130,19 +134,19 @@ const DentistDashboard = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-blue-600" />
+            <Calendar className="h-5 w-5 text-primary" />
             Appointment Management
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4">
             {appointments.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">No appointments scheduled</p>
+              <p className="text-center text-muted-foreground py-8">No appointments scheduled</p>
             ) : (
               appointments.map((appointment) => {
                 const { date, time } = formatDateTime(appointment.appointment_datetime);
                 return (
-                  <Card key={appointment.id} className="border-l-4 border-l-blue-500">
+                  <Card key={appointment.id} className="border-l-4 border-l-primary">
                     <CardContent className="pt-4">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex-1 space-y-2">
@@ -151,7 +155,7 @@ const DentistDashboard = () => {
                             {appointment.patient?.first_name} {appointment.patient?.last_name}
                           </div>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <Calendar className="h-4 w-4" />
                               {date}
@@ -167,13 +171,13 @@ const DentistDashboard = () => {
                           </div>
 
                           {appointment.notes && (
-                            <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                            <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
                               <strong>Notes:</strong> {appointment.notes}
                             </div>
                           )}
 
                           <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-500">Status:</span>
+                            <span className="text-sm text-muted-foreground">Status:</span>
                             {getStatusBadge(appointment.status)}
                           </div>
                         </div>
@@ -193,7 +197,7 @@ const DentistDashboard = () => {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleRescheduleAppointment(appointment)}
-                                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                                className="border-primary text-primary hover:bg-accent"
                               >
                                 <RefreshCw className="h-4 w-4 mr-1" />
                                 Reschedule
@@ -206,7 +210,7 @@ const DentistDashboard = () => {
                               <Button
                                 size="sm"
                                 onClick={() => handleCompleteAppointment(appointment)}
-                                className="bg-blue-600 hover:bg-blue-700"
+                                className="bg-primary hover:bg-primary/90"
                               >
                                 <CheckCircle className="h-4 w-4 mr-1" />
                                 Mark Complete
@@ -215,7 +219,7 @@ const DentistDashboard = () => {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleRescheduleAppointment(appointment)}
-                                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                                className="border-primary text-primary hover:bg-accent"
                               >
                                 <RefreshCw className="h-4 w-4 mr-1" />
                                 Reschedule

@@ -308,9 +308,9 @@ const DentalCertificateGenerator = ({ patient }: DentalCertificateGeneratorProps
                   Clear All
                 </Button>
               </div>
-              <div className="bg-slate-50 border rounded p-4 space-y-4">
+              <div className="bg-muted/40 border rounded p-4 space-y-4">
                 <div>
-                  <p className="text-sm text-gray-600 mb-2">Upper Teeth</p>
+                  <p className="text-sm text-muted-foreground mb-2">Upper Teeth</p>
                   <div className="grid grid-cols-8 gap-2">
                     {toothNumbers.upper.map((tooth) => (
                       <Button
@@ -326,7 +326,7 @@ const DentalCertificateGenerator = ({ patient }: DentalCertificateGeneratorProps
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 mb-2">Lower Teeth</p>
+                  <p className="text-sm text-muted-foreground mb-2">Lower Teeth</p>
                   <div className="grid grid-cols-8 gap-2">
                     {toothNumbers.lower.map((tooth) => (
                       <Button

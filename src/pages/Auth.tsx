@@ -1,13 +1,11 @@
-
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { Stethoscope } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import ToothMark from "@/components/ToothMark";
 
 const Auth = () => {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
@@ -17,12 +15,12 @@ const Auth = () => {
 
   useEffect(() => {
     if (user && !authLoading) {
-      navigate('/', { replace: true });
+      navigate("/", { replace: true });
     }
   }, [user, authLoading, navigate]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
 
     if (!loginData.email || !loginData.password) {
       toast.error("Please enter both username and password");
@@ -38,7 +36,7 @@ const Auth = () => {
         toast.error(error.message || "Login failed");
       } else {
         toast.success("Login successful!");
-        navigate('/', { replace: true });
+        navigate("/", { replace: true });
       }
     } catch {
       toast.error("An unexpected error occurred");
@@ -49,66 +47,111 @@ const Auth = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+      <div className="grid min-h-screen place-items-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <span className="grid h-12 w-12 animate-pulse place-items-center rounded-md bg-primary text-primary-foreground">
+            <ToothMark className="h-7 w-7" />
+          </span>
+          <p className="text-sm text-muted-foreground">Opening the clinic...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Stethoscope className="h-8 w-8 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-800">Dental Clinic</h1>
+    <div className="grid min-h-screen bg-background lg:grid-cols-[1.1fr_1fr]">
+      {/* Brand panel */}
+      <aside className="hidden flex-col justify-between border-r border-border bg-card p-10 lg:flex">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-md bg-primary text-primary-foreground">
+            <ToothMark className="h-6 w-6" />
+          </span>
+          <div>
+            <p className="font-display text-lg leading-none">Tooth Time</p>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Dental Clinic
+            </p>
           </div>
-          <p className="text-gray-600">Access Portal</p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Login</CardTitle>
-            <CardDescription>
-              Sign in to access the clinic management system
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <Label htmlFor="email">Username</Label>
-                <Input
-                  id="email"
-                  type="text"
-                  value={loginData.email}
-                  onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
-                  required
-                  disabled={loading}
-                  autoComplete="username"
-                />
-              </div>
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={loginData.password}
-                  onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
-                  required
-                  disabled={loading}
-                  autoComplete="current-password"
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+        <div className="max-w-md">
+          <h2 className="font-display text-3xl leading-tight">
+            The day&apos;s schedule, records and visits in one place.
+          </h2>
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            Appointments stay in sync across the front desk and treatment room, and the clinic keeps
+            working when the internet does not.
+          </p>
+          <div className="clinic-rule mt-8 max-w-xs" />
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Accounts are issued by the clinic administrator.
+        </p>
+      </aside>
+
+      {/* Sign-in form */}
+      <main className="flex items-center justify-center px-5 py-12">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <span className="grid h-10 w-10 place-items-center rounded-md bg-primary text-primary-foreground">
+              <ToothMark className="h-6 w-6" />
+            </span>
+            <div>
+              <p className="font-display text-lg leading-none">Tooth Time</p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                Dental Clinic
+              </p>
+            </div>
+          </div>
+
+          <h1 className="font-display text-2xl">Sign in</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Use your clinic username and password.
+          </p>
+
+          <form onSubmit={handleLogin} className="mt-7 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Username</Label>
+              <Input
+                id="email"
+                type="text"
+                value={loginData.email}
+                onChange={(event) =>
+                  setLoginData((previous) => ({ ...previous, email: event.target.value }))
+                }
+                required
+                disabled={loading}
+                autoComplete="username"
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={loginData.password}
+                onChange={(event) =>
+                  setLoginData((previous) => ({ ...previous, password: event.target.value }))
+                }
+                required
+                disabled={loading}
+                autoComplete="current-password"
+              />
+            </div>
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
+            </Button>
+          </form>
+
+          <p className="mt-8 text-[11px] leading-relaxed text-muted-foreground">
+            Patient records are confidential. Sign out before leaving a shared workstation.
+          </p>
+        </div>
+      </main>
     </div>
   );
 };

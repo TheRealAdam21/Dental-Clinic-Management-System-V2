@@ -242,9 +242,7 @@ const PatientForm = () => {
           visit_date: visit.visit_date,
           diagnosis: visit.diagnosis || undefined,
           treatment: visit.treatment,
-          treatment_provided: visit.treatment,
           treatment_cost: visit.treatment_cost,
-          amount_charged: visit.treatment_cost ?? undefined,
           notes: visit.notes || undefined,
         });
       }
@@ -328,8 +326,8 @@ const PatientForm = () => {
     <>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Register New Patient</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
+          <h2 className="text-xl font-semibold text-foreground dark:text-muted">Register New Patient</h2>
+          <p className="text-sm text-muted-foreground dark:text-border">
             Fill out the form manually or scan an existing physical record.
           </p>
         </div>
@@ -340,7 +338,7 @@ const PatientForm = () => {
       </div>
 
       {scannedVisits.length > 0 && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-900 px-4 py-3 text-sm">
+        <div className="rounded-lg border border-primary/25 bg-accent dark:bg-accent/20 dark:border-primary/40 px-4 py-3 text-sm">
           {scannedVisits.length} visit record(s) from the scan will be imported when you register this patient.
         </div>
       )}
@@ -905,7 +903,7 @@ const PatientForm = () => {
 
       <Button 
         type="submit" 
-        className="w-full bg-blue-600 hover:bg-blue-700"
+        className="w-full bg-primary hover:bg-primary/90"
         disabled={isSubmitting}
       >
         {isSubmitting ? "Registering..." : "Register Patient"}

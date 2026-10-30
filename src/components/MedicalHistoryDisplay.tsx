@@ -37,12 +37,12 @@ const MedicalHistoryDisplay = ({ patientId }: MedicalHistoryDisplayProps) => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-blue-600" />
+            <FileText className="h-5 w-5 text-primary" />
             Medical History
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-gray-500 text-center py-4">No medical history available</p>
+          <p className="text-muted-foreground text-center py-4">No medical history available</p>
         </CardContent>
       </Card>
     );
@@ -52,7 +52,7 @@ const MedicalHistoryDisplay = ({ patientId }: MedicalHistoryDisplayProps) => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-blue-600" />
+          <FileText className="h-5 w-5 text-primary" />
           Medical History
         </CardTitle>
       </CardHeader>

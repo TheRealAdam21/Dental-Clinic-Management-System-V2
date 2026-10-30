@@ -29,6 +29,7 @@ export interface Dentist {
   email?: string;
   phone?: string;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface Appointment {
@@ -76,30 +77,32 @@ export interface MedicalHistory {
   updated_at?: string;
 }
 
+/** Mirrors the public.visits columns in Supabase (see supabase/migrations). */
 export interface Visit {
   id: string;
   patient_id: string;
-  appointment_id?: string;
   visit_date: string;
-  diagnosis?: string;
-  treatment?: string;
-  treatment_provided?: string;
+  diagnosis: string;
+  treatment: string;
   treatment_cost?: number | null;
-  notes?: string;
-  amount_charged?: number;
+  notes?: string | null;
   xray_images?: string[] | null;
   created_at?: string;
+  updated_at?: string;
 }
 
+/** Mirrors the public.payments columns in Supabase. */
 export interface Payment {
   id: string;
-  visit_id: string;
   patient_id: string;
   amount: number;
   payment_date: string;
-  payment_method?: string;
-  notes?: string;
+  payment_method: string;
+  description?: string | null;
+  status?: string;
   created_at?: string;
+  updated_at?: string;
+  patient?: Pick<Patient, 'first_name' | 'last_name'>;
 }
 
 export interface SyncQueueItem {
@@ -108,8 +111,10 @@ export interface SyncQueueItem {
   operation: 'insert' | 'update' | 'delete';
   data: any;
   timestamp: number;
-  synced: boolean;
+  /** 0 = pending, 1 = already pushed. Must be numeric: IndexedDB cannot index booleans. */
+  synced: 0 | 1;
   retries?: number;
+  lastError?: string;
 }
 
 export interface AppState {

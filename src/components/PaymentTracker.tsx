@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { dataService } from "@/services/dataService";
 import { DollarSign, Plus, CreditCard, Calendar } from "lucide-react";
 
 const PaymentTracker = () => {
@@ -30,31 +30,20 @@ const PaymentTracker = () => {
   }, []);
 
   const fetchPayments = async () => {
-    const { data, error } = await supabase
-      .from('payments')
-      .select(`
-        *,
-        patient:patients(first_name, last_name)
-      `)
-      .order('payment_date', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching payments:', error);
-    } else {
+    try {
+      const data = await dataService.getPayments();
       setPayments(data || []);
+    } catch (error) {
+      console.error('Error fetching payments:', error);
     }
   };
 
   const fetchPatients = async () => {
-    const { data, error } = await supabase
-      .from('patients')
-      .select('id, first_name, last_name')
-      .order('last_name', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching patients:', error);
-    } else {
+    try {
+      const data = await dataService.getPatients();
       setPatients(data || []);
+    } catch (error) {
+      console.error('Error fetching patients:', error);
     }
   };
 
@@ -64,16 +53,21 @@ const PaymentTracker = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    try {
-      const { error } = await supabase
-        .from('payments')
-        .insert([{
-          ...formData,
-          amount: parseFloat(formData.amount)
-        }]);
 
-      if (error) throw error;
+    if (!formData.patient_id || !formData.payment_method || !formData.payment_date || !formData.amount) {
+      toast.error("Patient, amount, payment method, and payment date are required.");
+      return;
+    }
+
+    try {
+      await dataService.addPayment({
+        patient_id: formData.patient_id,
+        amount: parseFloat(formData.amount),
+        payment_method: formData.payment_method,
+        payment_date: formData.payment_date,
+        description: formData.description || null,
+        status: formData.status
+      });
 
       toast.success("Payment recorded successfully!");
       setFormData({
@@ -94,18 +88,14 @@ const PaymentTracker = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      completed: { color: "bg-green-500", text: "Completed" },
-      pending: { color: "bg-yellow-500", text: "Pending" },
-      refunded: { color: "bg-red-500", text: "Refunded" }
+      completed: { color: "bg-emerald-600 text-white", text: "Completed" },
+      pending: { color: "bg-amber-500 text-white", text: "Pending" },
+      refunded: { color: "bg-destructive text-destructive-foreground", text: "Refunded" }
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.completed;
-    
-    return (
-      <Badge className={`${config.color} text-white`}>
-        {config.text}
-      </Badge>
-    );
+
+    return <Badge className={config.color}>{config.text}</Badge>;
   };
 
   const getTotalRevenue = () => {
@@ -120,19 +110,19 @@ const PaymentTracker = () => {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-blue-600" />
+              <DollarSign className="h-5 w-5 text-primary" />
               Payment Management
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-sm text-gray-500">Total Revenue</p>
+                <p className="text-sm text-muted-foreground">Total Revenue</p>
                 <p className="text-2xl font-bold text-green-600">
                   ${getTotalRevenue().toFixed(2)}
                 </p>
               </div>
               <Button
                 onClick={() => setShowAddForm(!showAddForm)}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-primary hover:bg-primary/90"
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Payment
@@ -142,7 +132,7 @@ const PaymentTracker = () => {
         </CardHeader>
         <CardContent>
           {showAddForm && (
-            <Card className="mb-6 border-blue-200">
+            <Card className="mb-6 border-primary/25">
               <CardHeader>
                 <CardTitle className="text-lg">Record New Payment</CardTitle>
               </CardHeader>
@@ -232,7 +222,7 @@ const PaymentTracker = () => {
                   </div>
 
                   <div className="flex gap-2">
-                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                    <Button type="submit" className="bg-primary hover:bg-primary/90">
                       Record Payment
                     </Button>
                     <Button 
@@ -250,7 +240,7 @@ const PaymentTracker = () => {
 
           <div className="space-y-4">
             {payments.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">No payments recorded yet</p>
+              <p className="text-center text-muted-foreground py-8">No payments recorded yet</p>
             ) : (
               payments.map((payment) => (
                 <Card key={payment.id} className="border-l-4 border-l-green-500">
@@ -262,7 +252,7 @@ const PaymentTracker = () => {
                           {payment.patient?.first_name} {payment.patient?.last_name}
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-gray-600 mb-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-muted-foreground mb-2">
                           <div className="flex items-center gap-1">
                             <DollarSign className="h-4 w-4" />
                             ${payment.amount.toFixed(2)}
@@ -278,7 +268,7 @@ const PaymentTracker = () => {
                         </div>
 
                         {payment.description && (
-                          <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                          <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
                             {payment.description}
                           </p>
                         )}

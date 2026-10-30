@@ -6,6 +6,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -14,10 +21,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Camera, FileImage, Loader2, ScanLine, Trash2 } from "lucide-react";
-import { captureRecordImage, pickRecordImages } from "@/lib/cameraCapture";
+import { Camera, FileImage, Loader2, RotateCw, ScanLine, Stethoscope, Trash2, Wand2 } from "lucide-react";
+import { captureRecordImage, pickRecordImages, rotateImageDataUrl } from "@/lib/cameraCapture";
 import { recognizeTextFromImages } from "@/lib/ocrService";
-import { parsePatientRecordText, type ParsedVisit } from "@/lib/recordParser";
+import {
+  parsePatientRecordText,
+  type ParsedPatientRecord,
+  type ParsedVisit,
+} from "@/lib/recordParser";
 import { DataService } from "@/services/dataService";
 
 const dataService = new DataService();
@@ -45,6 +56,76 @@ const emptyVisit = (): ParsedVisit => ({
   notes: "",
 });
 
+const toFieldMap = (record: Record<string, string | string[]>): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? value.join(", ") : String(value ?? ""),
+    ])
+  );
+
+const splitList = (value: string | undefined): string[] =>
+  value ? value.split(",").map((item) => item.trim()).filter(Boolean) : [];
+
+const toMedicalPayload = (fields: Record<string, string>) => ({
+  ...fields,
+  allergies: splitList(fields.allergies),
+  medical_conditions: splitList(fields.medical_conditions),
+});
+
+const PATIENT_FIELDS: Array<{
+  key: string;
+  label: string;
+  type?: string;
+  span?: boolean;
+  required?: boolean;
+}> = [
+  { key: "first_name", label: "First Name", required: true },
+  { key: "last_name", label: "Last Name", required: true },
+  { key: "phone", label: "Phone", type: "tel", required: true },
+  { key: "email", label: "Email", type: "email" },
+  { key: "date_of_birth", label: "Date of Birth", type: "date" },
+  { key: "age", label: "Age", type: "number" },
+  { key: "gender", label: "Gender" },
+  { key: "marital_status", label: "Marital Status" },
+  { key: "occupation", label: "Occupation" },
+  { key: "address", label: "Address", span: true },
+  { key: "emergency_contact_name", label: "Emergency Contact" },
+  { key: "emergency_contact_phone", label: "Emergency Phone" },
+  { key: "insurance_provider", label: "Insurance Provider" },
+  { key: "insurance_policy_number", label: "Policy Number" },
+];
+
+const GENDER_OPTIONS = ["male", "female", "other"];
+const MARITAL_OPTIONS = ["single", "married", "divorced", "widowed", "separated"];
+
+const MEDICAL_YES_NO_FIELDS = [
+  { key: "in_good_health", label: "In good health?" },
+  { key: "in_medical_treatment", label: "Under medical treatment?" },
+  { key: "serious_illness", label: "Serious illness or surgery?" },
+  { key: "hospitalized", label: "Ever hospitalized?" },
+  { key: "taking_medication", label: "Taking medication?" },
+  { key: "uses_tobacco", label: "Uses tobacco?" },
+  { key: "uses_alcohol_drugs", label: "Uses alcohol or drugs?" },
+  { key: "is_pregnant", label: "Pregnant?" },
+  { key: "is_nursing", label: "Nursing?" },
+  { key: "taking_birth_control", label: "Taking birth control?" },
+];
+
+const MEDICAL_TEXT_FIELDS = [
+  { key: "physician_name", label: "Physician" },
+  { key: "physician_specialty", label: "Specialty" },
+  { key: "physician_phone", label: "Physician phone" },
+  { key: "treatment_condition", label: "Condition under treatment" },
+  { key: "illness_description", label: "Illness / operation" },
+  { key: "hospitalization_details", label: "Hospitalization details" },
+  { key: "medication_details", label: "Medication details" },
+  { key: "bleeding_time", label: "Bleeding time" },
+  { key: "blood_type", label: "Blood type" },
+  { key: "blood_pressure", label: "Blood pressure" },
+  { key: "other_allergy", label: "Other allergy" },
+];
+
 const PatientRecordScanner = ({
   open,
   onOpenChange,
@@ -63,6 +144,8 @@ const PatientRecordScanner = ({
   const [medicalFields, setMedicalFields] = useState<Record<string, string>>({});
   const [visits, setVisits] = useState<ParsedVisit[]>([]);
   const [saving, setSaving] = useState(false);
+  const [rotatingIndex, setRotatingIndex] = useState<number | null>(null);
+  const [showMedicalReview, setShowMedicalReview] = useState(false);
 
   const reset = () => {
     setStep("capture");
@@ -75,6 +158,8 @@ const PatientRecordScanner = ({
     setMedicalFields({});
     setVisits([]);
     setSaving(false);
+    setRotatingIndex(null);
+    setShowMedicalReview(false);
   };
 
   const handleClose = (nextOpen: boolean) => {
@@ -98,6 +183,67 @@ const PatientRecordScanner = ({
     }
   };
 
+  const handleRotate = async (index: number) => {
+    setRotatingIndex(index);
+    try {
+      const rotated = await rotateImageDataUrl(images[index], 90);
+      setImages((current) =>
+        current.map((image, imageIndex) => (imageIndex === index ? rotated : image))
+      );
+    } finally {
+      setRotatingIndex(null);
+    }
+  };
+
+  const updatePatientField = (key: string, value: string) => {
+    setPatientFields((current) => ({ ...current, [key]: value }));
+  };
+
+  const updateMedicalField = (key: string, value: string) => {
+    setMedicalFields((current) => ({ ...current, [key]: value }));
+  };
+
+  const applyParsedResult = (parsed: ParsedPatientRecord, autoApply: boolean) => {
+    const patientFieldMap = toFieldMap(parsed.patient);
+
+    if (patientFieldMap.date_of_birth && !patientFieldMap.age) {
+      const dob = new Date(patientFieldMap.date_of_birth);
+      if (!Number.isNaN(dob.getTime())) {
+        const age = Math.floor(
+          (Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+        );
+        if (age >= 0) patientFieldMap.age = String(age);
+      }
+    }
+
+    const medicalFieldMap = toFieldMap(parsed.medicalHistory);
+    const parsedVisits =
+      parsed.visits.length > 0 ? parsed.visits : mode === "visits" ? [emptyVisit()] : [];
+
+    setPatientFields(patientFieldMap);
+    setMedicalFields(medicalFieldMap);
+    setVisits(parsedVisits);
+    setRawText(parsed.rawText);
+    setShowMedicalReview(Object.values(medicalFieldMap).some((value) => value.trim()));
+
+    const hasPatientData = Boolean(
+      patientFieldMap.first_name ||
+        patientFieldMap.last_name ||
+        patientFieldMap.phone ||
+        patientFieldMap.date_of_birth
+    );
+
+    if (autoApply && onApplyToForm && mode === "patient" && hasPatientData) {
+      onApplyToForm({
+        patient: patientFieldMap,
+        medicalHistory: toMedicalPayload(medicalFieldMap),
+        visits: parsedVisits.filter((visit) => visit.visit_date || visit.treatment),
+      });
+    }
+
+    return { hasPatientData, parsedVisits };
+  };
+
   const handleScan = async () => {
     if (images.length === 0) {
       toast.error("Add at least one photo of the patient record first.");
@@ -115,64 +261,12 @@ const PatientRecordScanner = ({
       });
 
       const parsed = parsePatientRecordText(text);
-      const patientFieldMap = Object.fromEntries(
-        Object.entries(parsed.patient).map(([key, value]) => [
-          key,
-          Array.isArray(value) ? value.join(", ") : String(value ?? ""),
-        ])
-      );
-
-      if (patientFieldMap.date_of_birth && !patientFieldMap.age) {
-        const dob = new Date(patientFieldMap.date_of_birth);
-        if (!Number.isNaN(dob.getTime())) {
-          const age = Math.floor(
-            (Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-          );
-          if (age >= 0) patientFieldMap.age = String(age);
-        }
-      }
-
-      const medicalFieldMap = Object.fromEntries(
-        Object.entries(parsed.medicalHistory).map(([key, value]) => [
-          key,
-          Array.isArray(value) ? value.join(", ") : String(value ?? ""),
-        ])
-      );
-      const parsedVisits =
-        parsed.visits.length > 0 ? parsed.visits : mode === "visits" ? [emptyVisit()] : [];
-
-      setRawText(parsed.rawText);
-      setPatientFields(patientFieldMap);
-      setMedicalFields(medicalFieldMap);
-      setVisits(parsedVisits);
+      const { hasPatientData, parsedVisits } = applyParsedResult(parsed, true);
       setStep("review");
 
-      const hasPatientData = Boolean(
-        patientFieldMap.first_name ||
-          patientFieldMap.last_name ||
-          patientFieldMap.phone ||
-          patientFieldMap.date_of_birth
-      );
-
-      if (onApplyToForm && mode === "patient" && hasPatientData) {
-        onApplyToForm({
-          patient: patientFieldMap,
-          medicalHistory: {
-            ...medicalFieldMap,
-            allergies: medicalFieldMap.allergies
-              ? medicalFieldMap.allergies.split(",").map((item) => item.trim()).filter(Boolean)
-              : [],
-            medical_conditions: medicalFieldMap.medical_conditions
-              ? medicalFieldMap.medical_conditions.split(",").map((item) => item.trim()).filter(Boolean)
-              : [],
-          },
-          visits: parsedVisits.filter((visit) => visit.visit_date || visit.treatment),
-        });
-      }
-
-      if (!hasPatientData && parsed.visits.length === 0) {
+      if (!hasPatientData && parsedVisits.length === 0) {
         toast.warning(
-          "Could not confidently read the record. Review and edit the fields manually."
+          "Could not confidently read the record. Fix the scanned text or edit the fields manually."
         );
       } else if (onApplyToForm && mode === "patient" && hasPatientData) {
         toast.success("Record scanned and applied to the form. Review the details below.");
@@ -192,6 +286,16 @@ const PatientRecordScanner = ({
     } finally {
       setScanning(false);
     }
+  };
+
+  const handleReextract = () => {
+    if (!rawText.trim()) {
+      toast.error("The scanned text is empty. Scan the record again.");
+      return;
+    }
+
+    applyParsedResult(parsePatientRecordText(rawText), false);
+    toast.success("Fields re-extracted from the edited text.");
   };
 
   const updateVisit = (index: number, field: keyof ParsedVisit, value: string) => {
@@ -214,19 +318,18 @@ const PatientRecordScanner = ({
   const parsedForApply = useMemo(
     () => ({
       patient: patientFields,
-      medicalHistory: {
-        ...medicalFields,
-        allergies: medicalFields.allergies
-          ? medicalFields.allergies.split(",").map((item) => item.trim()).filter(Boolean)
-          : [],
-        medical_conditions: medicalFields.medical_conditions
-          ? medicalFields.medical_conditions.split(",").map((item) => item.trim()).filter(Boolean)
-          : [],
-      },
+      medicalHistory: toMedicalPayload(medicalFields),
       visits: visits.filter((visit) => visit.visit_date || visit.treatment),
     }),
     [patientFields, medicalFields, visits]
   );
+
+  const hasMedicalData = Object.values(medicalFields).some((value) => (value ?? "").trim());
+  const missingRequired =
+    mode === "patient" &&
+    (!patientFields.first_name?.trim() ||
+      !patientFields.last_name?.trim() ||
+      !patientFields.phone?.trim());
 
   const handleApplyToForm = () => {
     onApplyToForm?.(parsedForApply);
@@ -250,9 +353,7 @@ const PatientRecordScanner = ({
             visit_date: visit.visit_date,
             diagnosis: visit.diagnosis || undefined,
             treatment: visit.treatment,
-            treatment_provided: visit.treatment,
             treatment_cost: visit.treatment_cost,
-            amount_charged: visit.treatment_cost ?? undefined,
             notes: visit.notes || undefined,
           });
         }
@@ -316,12 +417,8 @@ const PatientRecordScanner = ({
           is_nursing: medicalFields.is_nursing || undefined,
           taking_birth_control: medicalFields.taking_birth_control || undefined,
           other_allergy: medicalFields.other_allergy || undefined,
-          allergies: medicalFields.allergies
-            ? medicalFields.allergies.split(",").map((item) => item.trim()).filter(Boolean)
-            : [],
-          medical_conditions: medicalFields.medical_conditions
-            ? medicalFields.medical_conditions.split(",").map((item) => item.trim()).filter(Boolean)
-            : [],
+          allergies: splitList(medicalFields.allergies),
+          medical_conditions: splitList(medicalFields.medical_conditions),
         });
       }
 
@@ -332,9 +429,7 @@ const PatientRecordScanner = ({
           visit_date: visit.visit_date,
           diagnosis: visit.diagnosis || undefined,
           treatment: visit.treatment,
-          treatment_provided: visit.treatment,
           treatment_cost: visit.treatment_cost,
-          amount_charged: visit.treatment_cost ?? undefined,
           notes: visit.notes || undefined,
         });
       }
@@ -357,12 +452,13 @@ const PatientRecordScanner = ({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ScanLine className="h-5 w-5 text-blue-600" />
+            <ScanLine className="h-5 w-5 text-primary" />
             {mode === "visits" ? "Scan Visit History" : "Scan Physical Patient Record"}
           </DialogTitle>
           <DialogDescription>
-            Take clear photos of printed or handwritten records. OCR works best with good lighting,
-            flat pages, and printed text. Review everything before saving.
+            Photograph printed or handwritten records. Flatten the page, fill the frame, and avoid
+            shadows; sideways photos can be rotated before scanning. Everything is editable before
+            saving.
           </DialogDescription>
         </DialogHeader>
 
@@ -377,6 +473,11 @@ const PatientRecordScanner = ({
                 <FileImage className="h-4 w-4 mr-2" />
                 Upload Images
               </Button>
+              {images.length > 0 && (
+                <Badge variant="secondary" className="self-center">
+                  {images.length} page{images.length > 1 ? "s" : ""} ready
+                </Badge>
+              )}
             </div>
 
             {images.length > 0 && (
@@ -392,6 +493,21 @@ const PatientRecordScanner = ({
                       onClick={() => setImages((current) => current.filter((_, i) => i !== index))}
                     >
                       <Trash2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary"
+                      className="absolute bottom-2 right-2 h-7 w-7"
+                      title="Rotate page 90°"
+                      onClick={() => handleRotate(index)}
+                      disabled={rotatingIndex === index}
+                    >
+                      {rotatingIndex === index ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RotateCw className="h-4 w-4" />
+                      )}
                     </Button>
                     <Badge className="absolute bottom-2 left-2">Page {index + 1}</Badge>
                   </div>
@@ -413,57 +529,136 @@ const PatientRecordScanner = ({
           <div className="space-y-6">
             {mode === "patient" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>First Name</Label>
-                  <Input
-                    value={patientFields.first_name ?? ""}
-                    onChange={(e) => setPatientFields((current) => ({ ...current, first_name: e.target.value }))}
-                  />
+                {PATIENT_FIELDS.map((field) => {
+                  const value = patientFields[field.key] ?? "";
+                  const isSelectField = field.key === "gender" || field.key === "marital_status";
+                  const options =
+                    field.key === "gender" ? GENDER_OPTIONS : MARITAL_OPTIONS;
+
+                  return (
+                    <div key={field.key} className={field.span ? "md:col-span-2" : ""}>
+                      <Label htmlFor={`scan-${field.key}`}>
+                        {field.label}
+                        {field.required ? " *" : ""}
+                      </Label>
+
+                      {isSelectField ? (
+                        <Select
+                          value={value || undefined}
+                          onValueChange={(next) => updatePatientField(field.key, next)}
+                        >
+                          <SelectTrigger id={`scan-${field.key}`}>
+                            <SelectValue placeholder="Not set" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {options.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : field.span ? (
+                        <Textarea
+                          id={`scan-${field.key}`}
+                          value={value}
+                          onChange={(event) => updatePatientField(field.key, event.target.value)}
+                          rows={2}
+                        />
+                      ) : (
+                        <Input
+                          id={`scan-${field.key}`}
+                          type={field.type ?? "text"}
+                          value={value}
+                          onChange={(event) => updatePatientField(field.key, event.target.value)}
+                        />
+                      )}
+
+                      {field.required && !value.trim() && (
+                        <p className="text-xs text-destructive mt-1">Needed before saving</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {mode === "patient" && hasMedicalData && (
+              <div className="rounded-lg border p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Stethoscope className="h-4 w-4 text-primary" />
+                    Medical history from scan
+                  </h3>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowMedicalReview((current) => !current)}
+                  >
+                    {showMedicalReview ? "Hide" : "Review"}
+                  </Button>
                 </div>
-                <div>
-                  <Label>Last Name</Label>
-                  <Input
-                    value={patientFields.last_name ?? ""}
-                    onChange={(e) => setPatientFields((current) => ({ ...current, last_name: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label>Phone</Label>
-                  <Input
-                    value={patientFields.phone ?? ""}
-                    onChange={(e) => setPatientFields((current) => ({ ...current, phone: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label>Email</Label>
-                  <Input
-                    value={patientFields.email ?? ""}
-                    onChange={(e) => setPatientFields((current) => ({ ...current, email: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label>Date of Birth</Label>
-                  <Input
-                    type="date"
-                    value={patientFields.date_of_birth ?? ""}
-                    onChange={(e) => setPatientFields((current) => ({ ...current, date_of_birth: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label>Age</Label>
-                  <Input
-                    value={patientFields.age ?? ""}
-                    onChange={(e) => setPatientFields((current) => ({ ...current, age: e.target.value }))}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label>Address</Label>
-                  <Textarea
-                    value={patientFields.address ?? ""}
-                    onChange={(e) => setPatientFields((current) => ({ ...current, address: e.target.value }))}
-                    rows={2}
-                  />
-                </div>
+
+                {showMedicalReview && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {MEDICAL_YES_NO_FIELDS.map((field) => (
+                        <div key={field.key}>
+                          <Label htmlFor={`scan-${field.key}`}>{field.label}</Label>
+                          <Select
+                            value={medicalFields[field.key] || "unknown"}
+                            onValueChange={(next) =>
+                              updateMedicalField(field.key, next === "unknown" ? "" : next)
+                            }
+                          >
+                            <SelectTrigger id={`scan-${field.key}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unknown">Not answered</SelectItem>
+                              <SelectItem value="yes">Yes</SelectItem>
+                              <SelectItem value="no">No</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
+
+                    {MEDICAL_TEXT_FIELDS.filter((field) => (medicalFields[field.key] ?? "").trim())
+                      .map((field) => (
+                        <div key={field.key}>
+                          <Label htmlFor={`scan-${field.key}`}>{field.label}</Label>
+                          <Input
+                            id={`scan-${field.key}`}
+                            value={medicalFields[field.key] ?? ""}
+                            onChange={(event) => updateMedicalField(field.key, event.target.value)}
+                          />
+                        </div>
+                      ))}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="scan-allergies">Allergies (comma separated)</Label>
+                        <Input
+                          id="scan-allergies"
+                          value={medicalFields.allergies ?? ""}
+                          onChange={(event) => updateMedicalField("allergies", event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="scan-conditions">Medical conditions (comma separated)</Label>
+                        <Input
+                          id="scan-conditions"
+                          value={medicalFields.medical_conditions ?? ""}
+                          onChange={(event) =>
+                            updateMedicalField("medical_conditions", event.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -539,9 +734,25 @@ const PatientRecordScanner = ({
               )}
             </div>
 
-            <div>
-              <Label>Raw OCR Text</Label>
-              <Textarea value={rawText} readOnly rows={6} className="font-mono text-xs" />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="scan-raw-text">Scanned text</Label>
+                <Button type="button" size="sm" variant="outline" onClick={handleReextract}>
+                  <Wand2 className="h-4 w-4 mr-1" />
+                  Re-extract fields
+                </Button>
+              </div>
+              <Textarea
+                id="scan-raw-text"
+                value={rawText}
+                onChange={(event) => setRawText(event.target.value)}
+                rows={8}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Correcting a misread word here and pressing &quot;Re-extract fields&quot; is usually
+                faster than retyping every field.
+              </p>
             </div>
           </div>
         )}
@@ -576,7 +787,7 @@ const PatientRecordScanner = ({
                   Apply to Form
                 </Button>
               )}
-              <Button type="button" onClick={handleSave} disabled={saving}>
+              <Button type="button" onClick={handleSave} disabled={saving || missingRequired}>
                 {saving ? "Saving..." : mode === "visits" ? "Import Visits" : "Save Patient"}
               </Button>
             </>

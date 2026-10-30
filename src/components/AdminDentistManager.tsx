@@ -239,14 +239,14 @@ const AdminDentistManager = () => {
         </CardHeader>
         <CardContent>
           {dentists.length === 0 ? (
-            <p className="text-sm text-gray-600">No dentists yet. Add one above.</p>
+            <p className="text-sm text-muted-foreground">No dentists yet. Add one above.</p>
           ) : (
             <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
               {dentists.map((dentist) => (
                 <div key={dentist.id} className="border rounded p-3 text-sm">
                   <p className="font-medium">Dr. {dentist.first_name} {dentist.last_name}</p>
-                  <p className="text-gray-600">Username: {dentist.username}</p>
-                  <p className="text-gray-600">
+                  <p className="text-muted-foreground">Username: {dentist.username}</p>
+                  <p className="text-muted-foreground">
                     {dentist.specialization || "No specialization"}
                     {dentist.phone ? ` • ${dentist.phone}` : ""}
                   </p>

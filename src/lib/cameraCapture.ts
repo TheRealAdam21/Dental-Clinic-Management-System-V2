@@ -23,6 +23,32 @@ const normalizeImageDataUrl = (dataUrl: string): Promise<string> =>
     image.src = dataUrl;
   });
 
+/** Rotates a captured page so sideways photos of a record can be scanned upright. */
+export const rotateImageDataUrl = (dataUrl: string, degrees: 90 | 270 = 90): Promise<string> =>
+  new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      if (!context) {
+        resolve(dataUrl);
+        return;
+      }
+
+      const swapDimensions = degrees % 180 !== 0;
+      canvas.width = swapDimensions ? image.height : image.width;
+      canvas.height = swapDimensions ? image.width : image.height;
+
+      context.translate(canvas.width / 2, canvas.height / 2);
+      context.rotate((degrees * Math.PI) / 180);
+      context.drawImage(image, -image.width / 2, -image.height / 2);
+
+      resolve(canvas.toDataURL("image/png"));
+    };
+    image.onerror = () => resolve(dataUrl);
+    image.src = dataUrl;
+  });
+
 const readFileAsDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
