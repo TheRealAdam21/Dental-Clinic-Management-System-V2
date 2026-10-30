@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Tooth Time",
+  "productName": "Dental Clinic",
   "version": "2.0.1",
   "identifier": "com.adam21.toothtime",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Tooth Time - Dental Clinic Management",
+        "title": "Dental Clinic",
         "width": 1280,
         "height": 800,
         "resizable": true,

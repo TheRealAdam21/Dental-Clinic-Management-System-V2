@@ -7,7 +7,7 @@
   "engines": {
     "node": "22.x"
   },
-  "description": "Tooth Time Management System",
+  "description": "Dental Clinic Management System",
   "scripts": {
     "dev": "node scripts/copy-tesseract-assets.mjs && vite",
     "clean": "rimraf out release",
@@ -117,7 +117,7 @@
   },
   "build": {
     "appId": "com.yourcompany.toothtime",
-    "productName": "Tooth Time",
+    "productName": "Dental Clinic",
     "copyright": "Copyright © 2025",
     "files": [
       "dist/**/*",

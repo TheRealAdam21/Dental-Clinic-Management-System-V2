@@ -67,9 +67,9 @@ const Auth = () => {
             <ToothMark className="h-6 w-6" />
           </span>
           <div>
-            <p className="font-display text-lg leading-none">Tooth Time</p>
+            <p className="font-display text-lg leading-none">Dental Clinic</p>
             <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              Dental Clinic
+              Management System
             </p>
           </div>
         </div>
@@ -98,9 +98,9 @@ const Auth = () => {
               <ToothMark className="h-6 w-6" />
             </span>
             <div>
-              <p className="font-display text-lg leading-none">Tooth Time</p>
+              <p className="font-display text-lg leading-none">Dental Clinic</p>
               <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Dental Clinic
+                Management System
               </p>
             </div>
           </div>
